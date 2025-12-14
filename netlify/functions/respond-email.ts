@@ -14,7 +14,7 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: 'Método no permitido' }),
     };
   }
 
@@ -35,7 +35,7 @@ export const handler: Handler = async (event) => {
     if (!budget.data) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Budget not found' }),
+        body: JSON.stringify({ error: 'Presupuesto no encontrado' }),
       };
     }
 
@@ -88,67 +88,69 @@ function generateAutoResponse(
 ): string {
   const hasPriceComplaint =
     clientMessage.toLowerCase().includes('caro') ||
-    clientMessage.toLowerCase().includes('preço') ||
-    clientMessage.toLowerCase().includes('valor');
+    clientMessage.toLowerCase().includes('precio') ||
+    clientMessage.toLowerCase().includes('importe') ||
+    clientMessage.toLowerCase().includes('coste') ||
+    clientMessage.toLowerCase().includes('vale');
 
-  let response = `Olá ${clientName},\n\nAgradecemos seu retorno!\n\n`;
+  let response = `Hola ${clientName},\n\n¡Gracias por tu respuesta!\n\n`;
 
   if (hasPriceComplaint) {
-    response += `Entendemos sua preocupação com o valor. Gostaria de explicar como chegamos a esse orçamento:\n\n`;
+    response += `Entiendo tu preocupación sobre el importe. Me gustaría explicarte cómo hemos calculado este presupuesto:\n\n`;
 
-    response += `🔧 TRANSPARÊNCIA NO PREÇO\n`;
+    response += `🔧 TRANSPARENCIA EN EL PRECIO\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    response += `1. QUALIDADE DO SERVIÇO\n`;
-    response += `   • Profissionais experientes e qualificados\n`;
-    response += `   • Garantia do serviço executado\n`;
-    response += `   • Materiais de qualidade incluídos no preço\n\n`;
+    response += `1. CALIDAD DEL SERVICIO\n`;
+    response += `   • Profesionales experimentados y cualificados\n`;
+    response += `   • Garantía del servicio ejecutado\n`;
+    response += `   • Materiales de calidad incluidos en el precio\n\n`;
 
-    response += `2. CUSTOS OPERACIONAIS\n`;
-    response += `   • Ferramentas e equipamentos profissionais\n`;
-    response += `   • Seguros e responsabilidades\n`;
-    response += `   • Impostos e taxas legais\n\n`;
+    response += `2. COSTES OPERATIVOS\n`;
+    response += `   • Herramientas y equipos profesionales\n`;
+    response += `   • Seguros y responsabilidades\n`;
+    response += `   • Impuestos y tasas legales\n\n`;
 
-    if (distanceKm > 10) {
-      response += `3. DESLOCAMENTO\n`;
-      response += `   • A distância de ${distanceKm}km aumenta custos de combustível e tempo\n`;
-      response += `   • Garantimos pontualidade mesmo em locais distantes\n\n`;
+    if (distanceKm > 15) {
+      response += `3. DESPLAZAMIENTO\n`;
+      response += `   • La distancia de ${distanceKm}km aumenta los costes de combustible y tiempo\n`;
+      response += `   • Garantizamos puntualidad incluso en ubicaciones distantes\n\n`;
     }
 
     if (difficultyFactor > 1) {
-      response += `4. COMPLEXIDADE DO TRABALHO\n`;
-      response += `   • Este serviço requer cuidados especiais\n`;
-      response += `   • Técnicas avançadas para melhor resultado\n`;
-      response += `   • Tempo adicional necessário para qualidade\n\n`;
+      response += `4. COMPLEJIDAD DEL TRABAJO\n`;
+      response += `   • Este servicio requiere cuidados especiales\n`;
+      response += `   • Técnicas avanzadas para un mejor resultado\n`;
+      response += `   • Tiempo adicional necesario para garantizar la calidad\n\n`;
     }
 
-    response += `💡 POR QUE ESCOLHER NOSSO SERVIÇO?\n`;
+    response += `💡 ¿POR QUÉ ELEGIR NUESTRO SERVICIO?\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    response += `✓ Experiência comprovada no mercado\n`;
-    response += `✓ Trabalho feito corretamente desde o início\n`;
-    response += `✓ Economia no longo prazo (sem retrabalho)\n`;
-    response += `✓ Atendimento personalizado e profissional\n`;
-    response += `✓ Prazo cumprido rigorosamente\n\n`;
+    response += `✓ Experiencia comprobada en el mercado\n`;
+    response += `✓ Trabajo bien hecho desde el principio\n`;
+    response += `✓ Ahorro a largo plazo (sin rehacer trabajos)\n`;
+    response += `✓ Atención personalizada y profesional\n`;
+    response += `✓ Plazos cumplidos rigurosamente\n\n`;
 
-    response += `⚠️ ATENÇÃO: Preços muito baixos podem significar:\n`;
-    response += `   • Materiais de baixa qualidade\n`;
-    response += `   • Profissionais sem experiência\n`;
-    response += `   • Trabalho mal feito que precisará refazer\n`;
-    response += `   • Sem garantias ou responsabilidade\n\n`;
+    response += `⚠️ ATENCIÓN: Precios muy bajos pueden significar:\n`;
+    response += `   • Materiales de baja calidad\n`;
+    response += `   • Profesionales sin experiencia\n`;
+    response += `   • Trabajo mal hecho que necesitará rehacerse\n`;
+    response += `   • Sin garantías ni responsabilidad\n\n`;
 
-    response += `Nosso objetivo é entregar um trabalho que você não precisará se preocupar depois. `;
-    response += `O valor reflete a qualidade e segurança que oferecemos.\n\n`;
+    response += `Nuestro objetivo es entregar un trabajo del que no tengas que preocuparte después. `;
+    response += `El precio refleja la calidad y seguridad que ofrecemos.\n\n`;
 
-    response += `Estamos abertos ao diálogo! Se tiver alguma sugestão ou quiser ajustar o escopo `;
-    response += `do projeto para adequar ao orçamento, ficaremos felizes em conversar.\n\n`;
+    response += `¡Estamos abiertos al diálogo! Si tienes alguna sugerencia o quieres ajustar el alcance `;
+    response += `del proyecto para adecuarlo al presupuesto, estaremos encantados de conversar.\n\n`;
   } else {
-    response += `Recebi sua mensagem e estou à disposição para esclarecer qualquer dúvida sobre o orçamento.\n\n`;
-    response += `Fique à vontade para entrar em contato se precisar de mais informações ou ajustes no projeto.\n\n`;
+    response += `He recibido tu mensaje y estoy a tu disposición para aclarar cualquier duda sobre el presupuesto.\n\n`;
+    response += `No dudes en ponerte en contacto si necesitas más información o ajustes en el proyecto.\n\n`;
   }
 
-  response += `Aguardo seu retorno!\n\n`;
-  response += `Atenciosamente,\n`;
-  response += `Equipe de Orçamentos`;
+  response += `¡Quedo a la espera de tu respuesta!\n\n`;
+  response += `Atentamente,\n`;
+  response += `Equipo de Presupuestos`;
 
   return response;
 }
@@ -161,7 +163,7 @@ async function sendEmail(
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (!resendApiKey) {
-    console.warn('RESEND_API_KEY not configured. Email not sent.');
+    console.warn('RESEND_API_KEY no configurada. Email no enviado.');
     return false;
   }
 
@@ -173,16 +175,16 @@ async function sendEmail(
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Orçamentos <orcamentos@example.com>',
+        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@example.com>',
         to: [to],
-        subject: `Re: Orçamento para ${name}`,
+        subject: `Re: Presupuesto para ${name}`,
         text: content,
       }),
     });
 
     return response.ok;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error al enviar email:', error);
     return false;
   }
 }
