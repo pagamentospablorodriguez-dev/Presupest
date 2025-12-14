@@ -65,10 +65,10 @@ export default function CreateBudget() {
           description: '',
         });
       } else {
-        setError(result.error || 'Erro ao gerar orçamento');
+        setError(result.error || 'Error al generar presupuesto');
       }
     } catch (err) {
-      setError('Erro ao conectar com o servidor');
+      setError('Error al conectar con el servidor');
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ export default function CreateBudget() {
     const basePrice = parseFloat(selectedService.base_price);
     const quantity = parseFloat(formData.quantity);
     const distanceKm = parseFloat(formData.distanceKm) || 0;
-    const distanceFee = distanceKm > 10 ? (distanceKm - 10) * 5 : 0;
+    const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
     const difficultyFactor = parseFloat(formData.difficultyFactor) || 1.0;
     return ((basePrice * quantity + distanceFee) * difficultyFactor).toFixed(2);
   };
@@ -89,14 +89,14 @@ export default function CreateBudget() {
     <div className="max-w-3xl mx-auto">
       <div className="bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Criar Novo Orçamento
+          Crear Nuevo Presupuesto
         </h2>
 
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md flex items-center">
             <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
             <span className="text-green-800">
-              Orçamento gerado e enviado com sucesso!
+              ¡Presupuesto generado y enviado con éxito!
             </span>
           </div>
         )}
@@ -111,7 +111,7 @@ export default function CreateBudget() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nome do Cliente *
+                Nombre del Cliente *
               </label>
               <input
                 type="text"
@@ -121,13 +121,13 @@ export default function CreateBudget() {
                   setFormData({ ...formData, clientName: e.target.value })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="João Silva"
+                placeholder="Juan García"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email do Cliente *
+                Email del Cliente *
               </label>
               <input
                 type="email"
@@ -137,13 +137,13 @@ export default function CreateBudget() {
                   setFormData({ ...formData, clientEmail: e.target.value })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="joao@example.com"
+                placeholder="juan@example.com"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Telefone
+                Teléfono
               </label>
               <input
                 type="tel"
@@ -152,13 +152,13 @@ export default function CreateBudget() {
                   setFormData({ ...formData, clientPhone: e.target.value })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="(11) 99999-9999"
+                placeholder="+34 666 777 888"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Serviço *
+                Servicio *
               </label>
               <select
                 required
@@ -168,10 +168,10 @@ export default function CreateBudget() {
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Selecione um serviço</option>
+                <option value="">Selecciona un servicio</option>
                 {services.map((service) => (
                   <option key={service.id} value={service.id}>
-                    {service.name} - R$ {service.base_price}/{service.unit}
+                    {service.name} - {service.base_price}€/{service.unit}
                   </option>
                 ))}
               </select>
@@ -179,7 +179,7 @@ export default function CreateBudget() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quantidade ({selectedService?.unit || 'unidade'}) *
+                Cantidad ({selectedService?.unit || 'unidad'}) *
               </label>
               <input
                 type="number"
@@ -197,7 +197,7 @@ export default function CreateBudget() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Distância (km) *
+                Distancia (km) *
               </label>
               <input
                 type="number"
@@ -212,13 +212,13 @@ export default function CreateBudget() {
                 placeholder="0"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Taxa de deslocamento: R$ 5/km acima de 10km
+                Gastos de desplazamiento: 3€/km por encima de 15km
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fator de Dificuldade *
+                Factor de Dificultad *
               </label>
               <select
                 required
@@ -229,19 +229,19 @@ export default function CreateBudget() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="1.0">Normal (1.0x)</option>
-                <option value="1.2">Média dificuldade (1.2x)</option>
-                <option value="1.5">Alta dificuldade (1.5x)</option>
-                <option value="2.0">Muito difícil (2.0x)</option>
+                <option value="1.2">Dificultad media (1.2x)</option>
+                <option value="1.5">Dificultad alta (1.5x)</option>
+                <option value="2.0">Muy difícil (2.0x)</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estimativa de Valor
+                Estimación del Importe
               </label>
               <div className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50">
                 <span className="text-lg font-bold text-gray-900">
-                  R$ {calculateEstimate()}
+                  {calculateEstimate()}€
                 </span>
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function CreateBudget() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observações
+              Observaciones
             </label>
             <textarea
               rows={4}
@@ -258,7 +258,7 @@ export default function CreateBudget() {
                 setFormData({ ...formData, description: e.target.value })
               }
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Detalhes adicionais sobre o serviço..."
+              placeholder="Detalles adicionales sobre el servicio..."
             />
           </div>
 
@@ -270,12 +270,12 @@ export default function CreateBudget() {
             {loading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Gerando e enviando...</span>
+                <span>Generando y enviando...</span>
               </>
             ) : (
               <>
                 <Send className="h-5 w-5" />
-                <span>Gerar e Enviar Orçamento</span>
+                <span>Generar y Enviar Presupuesto</span>
               </>
             )}
           </button>
