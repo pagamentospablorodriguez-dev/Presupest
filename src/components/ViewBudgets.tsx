@@ -33,10 +33,10 @@ export default function ViewBudgets() {
       rejected: 'bg-red-100 text-red-800',
     };
     const labels = {
-      pending: 'Pendente',
+      pending: 'Pendiente',
       sent: 'Enviado',
-      accepted: 'Aceito',
-      rejected: 'Rejeitado',
+      accepted: 'Aceptado',
+      rejected: 'Rechazado',
     };
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || styles.pending}`}>
@@ -46,7 +46,7 @@ export default function ViewBudgets() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    return new Date(dateString).toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -58,7 +58,7 @@ export default function ViewBudgets() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Carregando orçamentos...</div>
+        <div className="text-gray-600">Cargando presupuestos...</div>
       </div>
     );
   }
@@ -68,10 +68,10 @@ export default function ViewBudgets() {
       <div className="bg-white shadow-md rounded-lg p-12 text-center">
         <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          Nenhum orçamento criado
+          Ningún presupuesto creado
         </h3>
         <p className="text-gray-600">
-          Crie seu primeiro orçamento usando o botão "Novo Orçamento"
+          Crea tu primer presupuesto usando el botón "Nuevo Presupuesto"
         </p>
       </div>
     );
@@ -81,7 +81,7 @@ export default function ViewBudgets() {
     <div className="space-y-4">
       <div className="bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          Orçamentos Enviados
+          Presupuestos Enviados
         </h2>
 
         <div className="space-y-4">
@@ -106,20 +106,20 @@ export default function ViewBudgets() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="flex items-center text-sm text-gray-700">
-                  <span className="font-medium mr-2">Serviço:</span>
+                  <span className="font-medium mr-2">Servicio:</span>
                   {budget.services?.name}
                 </div>
                 <div className="flex items-center text-sm text-gray-700">
-                  <span className="font-medium mr-2">Quantidade:</span>
+                  <span className="font-medium mr-2">Cantidad:</span>
                   {budget.quantity} {budget.services?.unit}
                 </div>
                 <div className="flex items-center text-sm text-gray-700">
                   <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                  <span className="font-medium mr-2">Distância:</span>
+                  <span className="font-medium mr-2">Distancia:</span>
                   {budget.distance_km} km
                 </div>
                 <div className="flex items-center text-sm text-gray-700">
-                  <span className="font-medium mr-2">Dificuldade:</span>
+                  <span className="font-medium mr-2">Dificultad:</span>
                   {budget.difficulty_factor}x
                 </div>
               </div>
@@ -137,7 +137,7 @@ export default function ViewBudgets() {
                 </div>
                 <div className="flex items-center text-lg font-bold text-gray-900">
                   <DollarSign className="h-5 w-5 mr-1 text-green-600" />
-                  R$ {parseFloat(budget.total_price).toFixed(2)}
+                  {parseFloat(budget.total_price).toFixed(2)}€
                 </div>
               </div>
             </div>
