@@ -1,0 +1,113 @@
+SISTEMA DE AUTOMAÇÃO DE ORÇAMENTOS
+=====================================
+
+CONFIGURAÇÃO DO PROJETO
+------------------------
+
+1. CONFIGURAR VARIÁVEIS DE AMBIENTE
+
+Crie um arquivo .env na raiz do projeto com as seguintes variáveis:
+
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+SUPABASE_SERVICE_ROLE_KEY=sua_chave_service_role_do_supabase
+RESEND_API_KEY=sua_chave_api_do_resend
+EMAIL_FROM=Orçamentos <seu-email@seudominio.com>
+
+2. OBTER CREDENCIAIS DO SUPABASE
+
+- Acesse https://supabase.com e faça login
+- As credenciais estão em: Project Settings > API
+- VITE_SUPABASE_URL: URL do projeto
+- VITE_SUPABASE_ANON_KEY: anon/public key
+- SUPABASE_SERVICE_ROLE_KEY: service_role key
+
+3. OBTER API KEY DO RESEND (para envio de emails)
+
+- Acesse https://resend.com e crie uma conta
+- Vá em API Keys e crie uma nova chave
+- Configure o domínio verificado para envio de emails
+
+4. DEPLOY NO NETLIFY
+
+- Faça push do projeto para GitHub
+- Acesse https://app.netlify.com
+- Clique em "Add new site" > "Import an existing project"
+- Conecte seu repositório GitHub
+- Configure as variáveis de ambiente no Netlify:
+  * Site settings > Environment variables
+  * Adicione todas as variáveis do arquivo .env
+
+- O deploy será automático!
+
+COMO USAR O SISTEMA
+-------------------
+
+1. GERENCIAR SERVIÇOS
+   - Clique em "Serviços" na navegação
+   - Adicione, edite ou exclua serviços
+   - Configure preços base por unidade (m², hora, etc)
+
+2. CRIAR ORÇAMENTO
+   - Clique em "Novo Orçamento"
+   - Preencha os dados do cliente
+   - Selecione o serviço
+   - Informe quantidade, distância e dificuldade
+   - O sistema calcula automaticamente o preço
+   - Clique em "Gerar e Enviar Orçamento"
+   - O email é enviado automaticamente para o cliente!
+
+3. VISUALIZAR ORÇAMENTOS
+   - Clique em "Orçamentos"
+   - Veja todos os orçamentos criados e enviados
+   - Status: Pendente, Enviado, Aceito, Rejeitado
+
+4. RESPONDER EMAILS DE CLIENTES
+   - Quando um cliente responder reclamando do preço
+   - Clique em "Responder Email"
+   - Selecione o orçamento
+   - Cole a mensagem do cliente
+   - O sistema gera automaticamente uma resposta profissional
+   - Explica o valor e convence o cliente
+   - Email enviado automaticamente!
+
+CÁLCULO AUTOMÁTICO DO PREÇO
+----------------------------
+
+O sistema calcula o preço considerando:
+- Preço base do serviço × quantidade
+- Taxa de deslocamento (R$ 5/km acima de 10km)
+- Fator de dificuldade (1.0x a 2.0x)
+
+Exemplo:
+- Pintura de 50m² a R$ 25/m² = R$ 1.250
+- Distância 15km = R$ 25 de taxa (5km × R$5)
+- Dificuldade média (1.2x)
+- Total: (1.250 + 25) × 1.2 = R$ 1.530,00
+
+RESPOSTA AUTOMÁTICA INTELIGENTE
+--------------------------------
+
+Quando o cliente reclama do preço, o sistema:
+- Detecta palavras-chave ("caro", "preço", etc)
+- Gera resposta personalizada explicando o valor
+- Destaca qualidade, experiência e garantias
+- Compara com concorrentes de preço baixo
+- Mantém tom profissional e convincente
+- Objetivo: não perder o cliente!
+
+AUTOMAÇÃO COMPLETA
+------------------
+
+Seu tio só precisa:
+1. Preencher os dados do orçamento
+2. Clicar em enviar
+3. Pronto! Sistema faz tudo automaticamente
+
+Sem precisar:
+- Calcular preços manualmente
+- Escrever emails
+- Responder reclamações
+- Procrastinar aos finais de semana!
+
+O sistema trabalha sozinho para ele!

@@ -1,0 +1,149 @@
+import { useState, useEffect } from 'react';
+import { supabase, Budget } from '../lib/supabase';
+import { Calendar, User, Mail, DollarSign, MapPin, AlertCircle } from 'lucide-react';
+
+export default function ViewBudgets() {
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBudgets();
+  }, []);
+
+  const loadBudgets = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('budgets')
+      .select(`
+        *,
+        clients (*),
+        services (*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (data) setBudgets(data as Budget[]);
+    setLoading(false);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      sent: 'bg-blue-100 text-blue-800',
+      accepted: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
+    };
+    const labels = {
+      pending: 'Pendente',
+      sent: 'Enviado',
+      accepted: 'Aceito',
+      rejected: 'Rejeitado',
+    };
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || styles.pending}`}>
+        {labels[status as keyof typeof labels] || status}
+      </span>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Carregando orçamentos...</div>
+      </div>
+    );
+  }
+
+  if (budgets.length === 0) {
+    return (
+      <div className="bg-white shadow-md rounded-lg p-12 text-center">
+        <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          Nenhum orçamento criado
+        </h3>
+        <p className="text-gray-600">
+          Crie seu primeiro orçamento usando o botão "Novo Orçamento"
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          Orçamentos Enviados
+        </h2>
+
+        <div className="space-y-4">
+          {budgets.map((budget) => (
+            <div
+              key={budget.id}
+              className="border border-gray-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <User className="h-5 w-5 mr-2 text-gray-500" />
+                    {budget.clients?.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 flex items-center mt-1">
+                    <Mail className="h-4 w-4 mr-2" />
+                    {budget.clients?.email}
+                  </p>
+                </div>
+                {getStatusBadge(budget.status)}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center text-sm text-gray-700">
+                  <span className="font-medium mr-2">Serviço:</span>
+                  {budget.services?.name}
+                </div>
+                <div className="flex items-center text-sm text-gray-700">
+                  <span className="font-medium mr-2">Quantidade:</span>
+                  {budget.quantity} {budget.services?.unit}
+                </div>
+                <div className="flex items-center text-sm text-gray-700">
+                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="font-medium mr-2">Distância:</span>
+                  {budget.distance_km} km
+                </div>
+                <div className="flex items-center text-sm text-gray-700">
+                  <span className="font-medium mr-2">Dificuldade:</span>
+                  {budget.difficulty_factor}x
+                </div>
+              </div>
+
+              {budget.description && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm text-gray-700">{budget.description}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                <div className="flex items-center text-sm text-gray-600">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {formatDate(budget.created_at)}
+                </div>
+                <div className="flex items-center text-lg font-bold text-gray-900">
+                  <DollarSign className="h-5 w-5 mr-1 text-green-600" />
+                  R$ {parseFloat(budget.total_price).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
