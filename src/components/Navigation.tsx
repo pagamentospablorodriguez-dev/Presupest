@@ -7,10 +7,10 @@ type NavigationProps = {
 
 export default function Navigation({ currentPage, onNavigate }: NavigationProps) {
   const navItems = [
-    { id: 'create', label: 'Novo Orçamento', icon: FileText },
-    { id: 'budgets', label: 'Orçamentos', icon: List },
+    { id: 'create', label: 'Nuevo Presupuesto', icon: FileText },
+    { id: 'budgets', label: 'Presupuestos', icon: List },
     { id: 'respond', label: 'Responder Email', icon: Mail },
-    { id: 'services', label: 'Serviços', icon: Settings },
+    { id: 'services', label: 'Servicios', icon: Settings },
   ];
 
   return (
@@ -21,7 +21,7 @@ export default function Navigation({ currentPage, onNavigate }: NavigationProps)
             <div className="flex-shrink-0 flex items-center">
               <FileText className="h-8 w-8 text-blue-600" />
               <span className="ml-2 text-xl font-bold text-gray-900">
-                Sistema de Orçamentos
+                Presupest
               </span>
             </div>
           </div>
