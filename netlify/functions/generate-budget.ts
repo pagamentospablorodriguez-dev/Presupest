@@ -19,7 +19,7 @@ export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: 'Método no permitido' }),
     };
   }
 
@@ -60,13 +60,13 @@ export const handler: Handler = async (event) => {
     if (!service.data) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Service not found' }),
+        body: JSON.stringify({ error: 'Servicio no encontrado' }),
       };
     }
 
     const basePrice = parseFloat(service.data.base_price);
     const quantity = data.quantity;
-    const distanceFee = data.distanceKm > 10 ? (data.distanceKm - 10) * 5 : 0;
+    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
     const difficultyMultiplier = data.difficultyFactor;
 
     const subtotal = basePrice * quantity;
@@ -149,36 +149,36 @@ function generateEmailContent(
   description: string
 ): string {
   return `
-Olá ${clientName},
+Hola ${clientName},
 
-Obrigado por solicitar um orçamento! Segue abaixo o detalhamento completo:
+¡Gracias por solicitar un presupuesto! A continuación te detallo el desglose completo:
 
 ═══════════════════════════════════════
-ORÇAMENTO DETALHADO
+PRESUPUESTO DETALLADO
 ═══════════════════════════════════════
 
-Serviço: ${serviceName}
-Quantidade: ${quantity} ${unit}
-Preço base: R$ ${basePrice.toFixed(2)} por ${unit}
+Servicio: ${serviceName}
+Cantidad: ${quantity} ${unit}
+Precio base: ${basePrice.toFixed(2)}€ por ${unit}
 
-CÁLCULO DO VALOR:
+CÁLCULO DEL IMPORTE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subtotal: R$ ${(basePrice * quantity).toFixed(2)}
-${distanceFee > 0 ? `Taxa de deslocamento (${distanceKm}km): R$ ${distanceFee.toFixed(2)}` : 'Sem taxa de deslocamento (até 10km)'}
-${difficultyFactor > 1 ? `Fator de complexidade (${difficultyFactor}x): Trabalho com dificuldade acima do padrão` : ''}
+Subtotal: ${(basePrice * quantity).toFixed(2)}€
+${distanceFee > 0 ? `Gastos de desplazamiento (${distanceKm}km): ${distanceFee.toFixed(2)}€` : 'Sin gastos de desplazamiento (hasta 15km)'}
+${difficultyFactor > 1 ? `Factor de complejidad (${difficultyFactor}x): Trabajo con dificultad superior al estándar` : ''}
 
 ═══════════════════════════════════════
-VALOR TOTAL: R$ ${totalPrice.toFixed(2)}
+IMPORTE TOTAL: ${totalPrice.toFixed(2)}€
 ═══════════════════════════════════════
 
-${description ? `Observações:\n${description}\n` : ''}
+${description ? `Observaciones:\n${description}\n` : ''}
 
-Este orçamento é válido por 15 dias.
+Este presupuesto tiene una validez de 15 días.
 
-Estamos à disposição para qualquer dúvida!
+¡Estamos a tu disposición para cualquier consulta!
 
-Atenciosamente,
-Equipe de Orçamentos
+Atentamente,
+Equipo de Presupuestos
   `.trim();
 }
 
@@ -190,7 +190,7 @@ async function sendEmail(
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (!resendApiKey) {
-    console.warn('RESEND_API_KEY not configured. Email not sent.');
+    console.warn('RESEND_API_KEY no configurada. Email no enviado.');
     return false;
   }
 
@@ -202,16 +202,16 @@ async function sendEmail(
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Orçamentos <orcamentos@example.com>',
+        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@example.com>',
         to: [to],
-        subject: `Orçamento para ${name}`,
+        subject: `Presupuesto para ${name}`,
         text: content,
       }),
     });
 
     return response.ok;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error al enviar email:', error);
     return false;
   }
 }
