@@ -1,9 +1,9 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/Bolt Database-js';
+import { createClient } from '@supabase/supabase-js'; // Import correto
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-const Bolt Database = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Nome válido
 
 interface BudgetItem {
   serviceId: string;
@@ -30,7 +30,8 @@ export const handler: Handler = async (event) => {
   try {
     const data: ProjectRequest = JSON.parse(event.body || '{}');
 
-    let existingClient = await Bolt Database
+    // Verificar si el cliente existe
+    let existingClient = await supabaseAdmin
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
@@ -38,7 +39,7 @@ export const handler: Handler = async (event) => {
 
     let clientId: string;
     if (!existingClient.data) {
-      const newClient = await Bolt Database
+      const newClient = await supabaseAdmin
         .from('clients')
         .insert({
           name: data.clientName,
@@ -52,11 +53,12 @@ export const handler: Handler = async (event) => {
       clientId = existingClient.data.id;
     }
 
+    // Calcular total de servicios
     let totalGeneral = 0;
-    const itemsDetails = [];
+    const itemsDetails: any[] = [];
 
     for (const item of data.items) {
-      const service = await Bolt Database
+      const service = await supabaseAdmin
         .from('services')
         .select('*')
         .eq('id', item.serviceId)
@@ -67,8 +69,8 @@ export const handler: Handler = async (event) => {
       const basePrice = Number(service.data.base_price);
       const quantity = Number(item.quantity);
       const difficulty = Number(item.difficultyFactor);
-      
-      const itemTotal = (basePrice * quantity) * difficulty;
+
+      const itemTotal = basePrice * quantity * difficulty;
       totalGeneral += itemTotal;
 
       itemsDetails.push({
@@ -80,10 +82,12 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    // Desplazamiento
     const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
     const totalPrice = totalGeneral + distanceFee;
 
-    const project = await Bolt Database
+    // Crear proyecto
+    const project = await supabaseAdmin
       .from('projects')
       .insert({
         client_id: clientId,
@@ -97,8 +101,9 @@ export const handler: Handler = async (event) => {
       .select()
       .single();
 
+    // Guardar items
     for (let i = 0; i < data.items.length; i++) {
-      await supabase.from('budget_items').insert({
+      await supabaseAdmin.from('budget_items').insert({
         project_id: project.data!.id,
         service_id: data.items[i].serviceId,
         quantity: data.items[i].quantity,
@@ -107,6 +112,7 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    // Generar email
     const emailContent = generateConsolidatedEmail(
       data.clientName,
       data.projectName,
@@ -117,7 +123,7 @@ export const handler: Handler = async (event) => {
       data.observations || ''
     );
 
-    await supabase.from('email_history').insert({
+    await supabaseAdmin.from('email_history').insert({
       budget_id: project.data!.id,
       type: 'proposal',
       content: emailContent,
@@ -126,7 +132,7 @@ export const handler: Handler = async (event) => {
     const emailSent = await sendEmail(data.clientEmail, data.clientName, data.projectName, emailContent);
 
     if (emailSent) {
-      await Bolt Database
+      await supabaseAdmin
         .from('projects')
         .update({ status: 'sent', sent_at: new Date().toISOString() })
         .eq('id', project.data!.id);
