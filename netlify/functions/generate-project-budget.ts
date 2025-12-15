@@ -1,14 +1,14 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/Bolt Database-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const Bolt Database = createClient(supabaseUrl, supabaseServiceKey);
 
 interface BudgetItem {
   serviceId: string;
   quantity: number;
+  difficultyFactor: number;
   customNotes?: string;
 }
 
@@ -18,35 +18,27 @@ interface ProjectRequest {
   clientPhone?: string;
   projectName: string;
   distanceKm: number;
-  globalDifficulty: number;
   observations?: string;
   items: BudgetItem[];
 }
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Método no permitido' }),
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Método no permitido' }) };
   }
 
   try {
     const data: ProjectRequest = JSON.parse(event.body || '{}');
 
-    // ===============================
-    // CLIENTE
-    // ===============================
-    const existingClient = await supabase
+    let existingClient = await Bolt Database
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
       .maybeSingle();
 
     let clientId: string;
-
     if (!existingClient.data) {
-      const newClient = await supabase
+      const newClient = await Bolt Database
         .from('clients')
         .insert({
           name: data.clientName,
@@ -55,20 +47,16 @@ export const handler: Handler = async (event) => {
         })
         .select()
         .single();
-
       clientId = newClient.data!.id;
     } else {
       clientId = existingClient.data.id;
     }
 
-    // ===============================
-    // SERVICIOS
-    // ===============================
-    let subtotalGeneral = 0;
-    const itemsDetails: any[] = [];
+    let totalGeneral = 0;
+    const itemsDetails = [];
 
     for (const item of data.items) {
-      const service = await supabase
+      const service = await Bolt Database
         .from('services')
         .select('*')
         .eq('id', item.serviceId)
@@ -78,40 +66,30 @@ export const handler: Handler = async (event) => {
 
       const basePrice = Number(service.data.base_price);
       const quantity = Number(item.quantity);
-      const subtotal = basePrice * quantity;
-
-      subtotalGeneral += subtotal;
+      const difficulty = Number(item.difficultyFactor);
+      
+      const itemTotal = (basePrice * quantity) * difficulty;
+      totalGeneral += itemTotal;
 
       itemsDetails.push({
         service: service.data,
         quantity,
-        subtotal,
+        difficulty,
+        itemTotal,
         notes: item.customNotes || '',
       });
     }
 
-    // ===============================
-    // DESPLAZAMIENTO
-    // ===============================
-    const distanceFee =
-      data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+    const totalPrice = totalGeneral + distanceFee;
 
-    // ===============================
-    // TOTAL
-    // ===============================
-    const totalPrice =
-      (subtotalGeneral + distanceFee) * data.globalDifficulty;
-
-    // ===============================
-    // PROYECTO
-    // ===============================
-    const project = await supabase
+    const project = await Bolt Database
       .from('projects')
       .insert({
         client_id: clientId,
         project_name: data.projectName,
         distance_km: data.distanceKm,
-        global_difficulty: data.globalDifficulty,
+        global_difficulty: 1.0,
         observations: data.observations || '',
         total_price: totalPrice.toFixed(2),
         status: 'pending',
@@ -119,30 +97,22 @@ export const handler: Handler = async (event) => {
       .select()
       .single();
 
-    // ===============================
-    // ITEMS
-    // ===============================
     for (let i = 0; i < data.items.length; i++) {
       await supabase.from('budget_items').insert({
         project_id: project.data!.id,
         service_id: data.items[i].serviceId,
         quantity: data.items[i].quantity,
         custom_notes: data.items[i].customNotes || '',
-        subtotal: itemsDetails[i].subtotal,
+        subtotal: itemsDetails[i].itemTotal,
       });
     }
 
-    // ===============================
-    // EMAIL
-    // ===============================
     const emailContent = generateConsolidatedEmail(
       data.clientName,
       data.projectName,
       itemsDetails,
-      subtotalGeneral,
       data.distanceKm,
       distanceFee,
-      data.globalDifficulty,
       totalPrice,
       data.observations || ''
     );
@@ -153,20 +123,12 @@ export const handler: Handler = async (event) => {
       content: emailContent,
     });
 
-    const emailSent = await sendEmail(
-      data.clientEmail,
-      data.clientName,
-      data.projectName,
-      emailContent
-    );
+    const emailSent = await sendEmail(data.clientEmail, data.clientName, data.projectName, emailContent);
 
     if (emailSent) {
-      await supabase
+      await Bolt Database
         .from('projects')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-        })
+        .update({ status: 'sent', sent_at: new Date().toISOString() })
         .eq('id', project.data!.id);
     }
 
@@ -180,40 +142,36 @@ export const handler: Handler = async (event) => {
       }),
     };
   } catch (error: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-// =====================================================
-// EMAIL TEMPLATE
-// =====================================================
 function generateConsolidatedEmail(
   clientName: string,
   projectName: string,
   items: any[],
-  subtotal: number,
   distanceKm: number,
   distanceFee: number,
-  difficulty: number,
   totalPrice: number,
   observations: string
 ): string {
   let itemsList = '';
-
   items.forEach((item, idx) => {
     itemsList += `${idx + 1}. ${item.service.name}\n`;
-    itemsList += `   ${item.quantity} ${item.service.unit} × ${item.service.base_price}€ = ${item.subtotal.toFixed(2)}€\n`;
-    if (item.notes) itemsList += `   Nota: ${item.notes}\n`;
+    itemsList += `   ${item.quantity} ${item.service.unit} × ${item.service.base_price}€`;
+    if (item.difficulty > 1) {
+      itemsList += ` × ${item.difficulty} = ${item.itemTotal.toFixed(2)}€\n`;
+    } else {
+      itemsList += ` = ${item.itemTotal.toFixed(2)}€\n`;
+    }
+    if (item.notes) itemsList += `   ${item.notes}\n`;
     itemsList += '\n';
   });
 
   return `
 Estimado/a ${clientName},
 
-Tras nuestra visita técnica, le presentamos el presupuesto detallado para la obra solicitada.
+Tras la visita técnica realizada, le presentamos el presupuesto detallado para su obra.
 
 ═══════════════════════════════════════════════════════════
 PRESUPUESTO: ${projectName.toUpperCase()}
@@ -223,35 +181,24 @@ SERVICIOS INCLUIDOS
 ───────────────────────────────────────────────────────────
 
 ${itemsList}
-
-───────────────────────────────────────────────────────────
-Subtotal servicios:                        ${subtotal.toFixed(2)}€
-${distanceFee > 0 ? `Desplazamiento (${distanceKm} km):                  ${distanceFee.toFixed(2)}€` : ''}
-${difficulty > 1 ? `Factor de complejidad (x${difficulty}):              Aplicado` : ''}
-
+${distanceFee > 0 ? `Gastos de desplazamiento (${distanceKm} km):        ${distanceFee.toFixed(2)}€\n` : ''}
 ═══════════════════════════════════════════════════════════
 IMPORTE TOTAL:                             ${totalPrice.toFixed(2)}€
 ═══════════════════════════════════════════════════════════
 
 ${observations ? `OBSERVACIONES:\n${observations}\n\n` : ''}
 ✓ Presupuesto elaborado tras visita técnica
-✓ Materiales incluidos
-✓ Garantía del trabajo
-✓ Validez: 15 días
+✓ Materiales de primera calidad incluidos
+✓ Garantía de todos los trabajos realizados
+✓ Validez del presupuesto: 15 días
+
+Quedamos a su entera disposición para cualquier consulta.
 
 Un cordial saludo.
   `.trim();
 }
 
-// =====================================================
-// SEND EMAIL (RESEND)
-// =====================================================
-async function sendEmail(
-  to: string,
-  name: string,
-  project: string,
-  content: string
-): Promise<boolean> {
+async function sendEmail(to: string, name: string, project: string, content: string): Promise<boolean> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return false;
 
@@ -263,15 +210,12 @@ async function sendEmail(
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from:
-          process.env.EMAIL_FROM ||
-          'Presupuestos <presupuestos@tuempresa.com>',
+        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@tuempresa.com>',
         to: [to],
         subject: `Presupuesto: ${project} - ${name}`,
         text: content,
       }),
     });
-
     return response.ok;
   } catch {
     return false;
