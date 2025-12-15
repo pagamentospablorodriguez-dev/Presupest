@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/Bolt Database-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -24,10 +24,10 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const Bolt Database = createClient(supabaseUrl, supabaseKey);
     const data: BudgetRequest = JSON.parse(event.body || '{}');
 
-    let client = await supabase
+    let client = await Bolt Database
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
@@ -36,7 +36,7 @@ export const handler: Handler = async (event) => {
     let clientId: string;
 
     if (!client.data) {
-      const newClient = await supabase
+      const newClient = await Bolt Database
         .from('clients')
         .insert({
           name: data.clientName,
@@ -51,7 +51,7 @@ export const handler: Handler = async (event) => {
       clientId = client.data.id;
     }
 
-    const service = await supabase
+    const service = await Bolt Database
       .from('services')
       .select('*')
       .eq('id', data.serviceId)
@@ -72,14 +72,14 @@ export const handler: Handler = async (event) => {
     const subtotal = basePrice * quantity;
     const totalPrice = (subtotal + distanceFee) * difficultyMultiplier;
 
-    const budget = await supabase
+    const budget = await Bolt Database
       .from('budgets')
       .insert({
         client_id: clientId,
         service_id: data.serviceId,
         quantity: quantity,
         distance_km: data.distanceKm,
-        difficulty_factor: difficultyFactor,
+        difficulty_factor: data.difficultyFactor,
         total_price: totalPrice.toFixed(2),
         description: data.description || '',
         status: 'pending',
@@ -113,7 +113,7 @@ export const handler: Handler = async (event) => {
     );
 
     if (emailSent) {
-      await supabase
+      await Bolt Database
         .from('budgets')
         .update({ status: 'sent', sent_at: new Date().toISOString() })
         .eq('id', budget.data!.id);
