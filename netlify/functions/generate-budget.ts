@@ -1,8 +1,10 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/Bolt Database-js';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface BudgetRequest {
   clientName: string;
@@ -24,19 +26,47 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const Bolt Database = createClient(supabaseUrl, supabaseKey);
-    const data: BudgetRequest = JSON.parse(event.body || '{}');
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Cuerpo de la petición vacío' }),
+      };
+    }
 
-    let client = await Bolt Database
+    const data: BudgetRequest = JSON.parse(event.body);
+
+    if (
+      !data.clientName ||
+      !data.clientEmail ||
+      !data.serviceId ||
+      !data.quantity ||
+      !data.distanceKm ||
+      !data.difficultyFactor
+    ) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Datos incompletos para generar presupuesto' }),
+      };
+    }
+
+    /* ===========================
+       CLIENTE
+    =========================== */
+
+    const existingClient = await supabase
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
       .maybeSingle();
 
+    if (existingClient.error) {
+      throw new Error(existingClient.error.message);
+    }
+
     let clientId: string;
 
-    if (!client.data) {
-      const newClient = await Bolt Database
+    if (!existingClient.data) {
+      const newClient = await supabase
         .from('clients')
         .insert({
           name: data.clientName,
@@ -46,46 +76,69 @@ export const handler: Handler = async (event) => {
         .select()
         .single();
 
-      clientId = newClient.data!.id;
+      if (newClient.error || !newClient.data) {
+        throw new Error('Error al crear cliente');
+      }
+
+      clientId = newClient.data.id;
     } else {
-      clientId = client.data.id;
+      clientId = existingClient.data.id;
     }
 
-    const service = await Bolt Database
+    /* ===========================
+       SERVICIO
+    =========================== */
+
+    const service = await supabase
       .from('services')
       .select('*')
       .eq('id', data.serviceId)
       .single();
 
-    if (!service.data) {
+    if (service.error || !service.data) {
       return {
         statusCode: 404,
         body: JSON.stringify({ error: 'Servicio no encontrado' }),
       };
     }
 
-    const basePrice = parseFloat(service.data.base_price);
-    const quantity = data.quantity;
-    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
-    const difficultyMultiplier = data.difficultyFactor;
+    const basePrice = Number(service.data.base_price);
+    const quantity = Number(data.quantity);
+
+    const distanceFee =
+      data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+
+    const difficultyMultiplier = Number(data.difficultyFactor);
 
     const subtotal = basePrice * quantity;
     const totalPrice = (subtotal + distanceFee) * difficultyMultiplier;
 
-    const budget = await Bolt Database
+    /* ===========================
+       PRESUPUESTO
+    =========================== */
+
+    const budget = await supabase
       .from('budgets')
       .insert({
         client_id: clientId,
         service_id: data.serviceId,
         quantity: quantity,
         distance_km: data.distanceKm,
-        difficulty_factor: data.difficultyFactor,
+        difficulty_factor: difficultyMultiplier,
         total_price: totalPrice.toFixed(2),
         description: data.description || '',
         status: 'pending',
       })
       .select()
       .single();
+
+    if (budget.error || !budget.data) {
+      throw new Error('Error al crear presupuesto');
+    }
+
+    /* ===========================
+       EMAIL
+    =========================== */
 
     const emailContent = generateEmailContent(
       data.clientName,
@@ -101,7 +154,7 @@ export const handler: Handler = async (event) => {
     );
 
     await supabase.from('email_history').insert({
-      budget_id: budget.data!.id,
+      budget_id: budget.data.id,
       type: 'proposal',
       content: emailContent,
     });
@@ -113,17 +166,20 @@ export const handler: Handler = async (event) => {
     );
 
     if (emailSent) {
-      await Bolt Database
+      await supabase
         .from('budgets')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
-        .eq('id', budget.data!.id);
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        })
+        .eq('id', budget.data.id);
     }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        budgetId: budget.data!.id,
+        budgetId: budget.data.id,
         totalPrice: totalPrice.toFixed(2),
         emailSent,
       }),
@@ -135,6 +191,10 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
+/* ===========================
+   EMAIL TEMPLATE
+=========================== */
 
 function generateEmailContent(
   clientName: string,
@@ -151,36 +211,44 @@ function generateEmailContent(
   return `
 Hola ${clientName},
 
-¡Gracias por solicitar un presupuesto! A continuación te detallo el desglose completo:
+Gracias por solicitar un presupuesto. A continuación te detallamos el cálculo completo:
 
-═══════════════════════════════════════
+══════════════════════════════════════
 PRESUPUESTO DETALLADO
-═══════════════════════════════════════
+══════════════════════════════════════
 
 Servicio: ${serviceName}
-Cantidad: ${quantity} ${unit}
-Precio base: ${basePrice.toFixed(2)}€ por ${unit}
+Superficie / Cantidad: ${quantity} ${unit}
+Precio base: ${basePrice.toFixed(2)} € por ${unit}
 
-CÁLCULO DEL IMPORTE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subtotal: ${(basePrice * quantity).toFixed(2)}€
-${distanceFee > 0 ? `Gastos de desplazamiento (${distanceKm}km): ${distanceFee.toFixed(2)}€` : 'Sin gastos de desplazamiento (hasta 15km)'}
-${difficultyFactor > 1 ? `Factor de complejidad (${difficultyFactor}x): Trabajo con dificultad superior al estándar` : ''}
+CÁLCULO DEL IMPORTE
+────────────────────────────────────
+Subtotal: ${(basePrice * quantity).toFixed(2)} €
+${distanceFee > 0
+  ? `Desplazamiento (${distanceKm} km): ${distanceFee.toFixed(2)} €`
+  : 'Desplazamiento incluido (hasta 15 km)'}
 
-═══════════════════════════════════════
-IMPORTE TOTAL: ${totalPrice.toFixed(2)}€
-═══════════════════════════════════════
+${difficultyFactor > 1
+  ? `Factor de dificultad aplicado: x${difficultyFactor}`
+  : 'Dificultad estándar'}
 
-${description ? `Observaciones:\n${description}\n` : ''}
+══════════════════════════════════════
+IMPORTE TOTAL: ${totalPrice.toFixed(2)} €
+══════════════════════════════════════
 
-Este presupuesto tiene una validez de 15 días.
+${description ? `Observaciones:\n${description}\n\n` : ''}
+Presupuesto elaborado tras visita técnica.
+Validez del presupuesto: 15 días.
 
-¡Estamos a tu disposición para cualquier consulta!
+Quedamos a tu disposición para cualquier consulta.
 
-Atentamente,
-Equipo de Presupuestos
-  `.trim();
+Un saludo cordial.
+`.trim();
 }
+
+/* ===========================
+   EMAIL SENDER (RESEND)
+=========================== */
 
 async function sendEmail(
   to: string,
@@ -190,7 +258,7 @@ async function sendEmail(
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (!resendApiKey) {
-    console.warn('RESEND_API_KEY no configurada. Email no enviado.');
+    console.warn('RESEND_API_KEY no configurada');
     return false;
   }
 
@@ -202,7 +270,7 @@ async function sendEmail(
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@example.com>',
+        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@tuempresa.com>',
         to: [to],
         subject: `Presupuesto para ${name}`,
         text: content,
@@ -211,7 +279,7 @@ async function sendEmail(
 
     return response.ok;
   } catch (error) {
-    console.error('Error al enviar email:', error);
+    console.error('Error enviando email:', error);
     return false;
   }
 }
