@@ -1,9 +1,10 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/Bolt Database-js';
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-const Bolt Database = createClient(supabaseUrl, supabaseServiceKey);
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface BudgetItem {
   serviceId: string;
@@ -24,22 +25,28 @@ interface ProjectRequest {
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Método no permitido' }) };
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Método no permitido' }),
+    };
   }
 
   try {
     const data: ProjectRequest = JSON.parse(event.body || '{}');
 
-    // Crear o encontrar cliente
-    let existingClient = await Bolt Database
+    // ===============================
+    // CLIENTE
+    // ===============================
+    const existingClient = await supabase
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
       .maybeSingle();
 
     let clientId: string;
+
     if (!existingClient.data) {
-      const newClient = await Bolt Database
+      const newClient = await supabase
         .from('clients')
         .insert({
           name: data.clientName,
@@ -48,17 +55,20 @@ export const handler: Handler = async (event) => {
         })
         .select()
         .single();
+
       clientId = newClient.data!.id;
     } else {
       clientId = existingClient.data.id;
     }
 
-    // Calcular todos los servicios
+    // ===============================
+    // SERVICIOS
+    // ===============================
     let subtotalGeneral = 0;
-    const itemsDetails = [];
+    const itemsDetails: any[] = [];
 
     for (const item of data.items) {
-      const service = await Bolt Database
+      const service = await supabase
         .from('services')
         .select('*')
         .eq('id', item.serviceId)
@@ -80,14 +90,22 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Desplazamiento (UNA vez para toda la obra)
-    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+    // ===============================
+    // DESPLAZAMIENTO
+    // ===============================
+    const distanceFee =
+      data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
 
-    // Total con dificultad
-    const totalPrice = (subtotalGeneral + distanceFee) * data.globalDifficulty;
+    // ===============================
+    // TOTAL
+    // ===============================
+    const totalPrice =
+      (subtotalGeneral + distanceFee) * data.globalDifficulty;
 
-    // Crear proyecto
-    const project = await Bolt Database
+    // ===============================
+    // PROYECTO
+    // ===============================
+    const project = await supabase
       .from('projects')
       .insert({
         client_id: clientId,
@@ -101,7 +119,9 @@ export const handler: Handler = async (event) => {
       .select()
       .single();
 
-    // Guardar items
+    // ===============================
+    // ITEMS
+    // ===============================
     for (let i = 0; i < data.items.length; i++) {
       await supabase.from('budget_items').insert({
         project_id: project.data!.id,
@@ -112,7 +132,9 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Email consolidado
+    // ===============================
+    // EMAIL
+    // ===============================
     const emailContent = generateConsolidatedEmail(
       data.clientName,
       data.projectName,
@@ -131,12 +153,20 @@ export const handler: Handler = async (event) => {
       content: emailContent,
     });
 
-    const emailSent = await sendEmail(data.clientEmail, data.clientName, data.projectName, emailContent);
+    const emailSent = await sendEmail(
+      data.clientEmail,
+      data.clientName,
+      data.projectName,
+      emailContent
+    );
 
     if (emailSent) {
-      await Bolt Database
+      await supabase
         .from('projects')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        })
         .eq('id', project.data!.id);
     }
 
@@ -150,10 +180,16 @@ export const handler: Handler = async (event) => {
       }),
     };
   } catch (error: any) {
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message }),
+    };
   }
 };
 
+// =====================================================
+// EMAIL TEMPLATE
+// =====================================================
 function generateConsolidatedEmail(
   clientName: string,
   projectName: string,
@@ -166,6 +202,7 @@ function generateConsolidatedEmail(
   observations: string
 ): string {
   let itemsList = '';
+
   items.forEach((item, idx) => {
     itemsList += `${idx + 1}. ${item.service.name}\n`;
     itemsList += `   ${item.quantity} ${item.service.unit} × ${item.service.base_price}€ = ${item.subtotal.toFixed(2)}€\n`;
@@ -198,17 +235,23 @@ IMPORTE TOTAL:                             ${totalPrice.toFixed(2)}€
 
 ${observations ? `OBSERVACIONES:\n${observations}\n\n` : ''}
 ✓ Presupuesto elaborado tras visita técnica
-✓ Materiales de calidad incluidos
-✓ Garantía del trabajo realizado
+✓ Materiales incluidos
+✓ Garantía del trabajo
 ✓ Validez: 15 días
-
-Quedamos a su disposición para cualquier consulta o aclaración.
 
 Un cordial saludo.
   `.trim();
 }
 
-async function sendEmail(to: string, name: string, project: string, content: string): Promise<boolean> {
+// =====================================================
+// SEND EMAIL (RESEND)
+// =====================================================
+async function sendEmail(
+  to: string,
+  name: string,
+  project: string,
+  content: string
+): Promise<boolean> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return false;
 
@@ -220,12 +263,15 @@ async function sendEmail(to: string, name: string, project: string, content: str
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@tuempresa.com>',
+        from:
+          process.env.EMAIL_FROM ||
+          'Presupuestos <presupuestos@tuempresa.com>',
         to: [to],
         subject: `Presupuesto: ${project} - ${name}`,
         text: content,
       }),
     });
+
     return response.ok;
   } catch {
     return false;
