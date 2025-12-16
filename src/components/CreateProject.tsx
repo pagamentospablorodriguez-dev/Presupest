@@ -252,7 +252,7 @@ Un cordial saludo.
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-t-lg shadow-lg">
-        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest Pro - Automatiza Tus Presupuestos</h2>
+        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest - Automatiza Tus Presupuestos</h2>
         <p className="text-lg text-blue-50 leading-relaxed">
           De la <strong>visita técnica al email profesional</strong> en <strong>2 minutos</strong>. 
           Presupuestos <strong>multi-servicio</strong> con cálculo automático, análisis inteligente de complejidad y PDF. 
