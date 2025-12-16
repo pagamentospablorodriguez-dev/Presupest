@@ -225,7 +225,7 @@ Un cordial saludo.`;
     <div className="max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-t-lg shadow-lg">
         <h2 className="text-3xl font-bold mb-3">
-  🏗️ Presupest — Presupuestos Profesionales en Minutos
+  Presupest — Presupuestos Profesionales en Minutos
 </h2>
         <p className="text-lg text-blue-50 leading-relaxed">
   De la <strong>visita técnica al presupuesto listo para enviar</strong> en <strong>2 minutos</strong>.
