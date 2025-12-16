@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Calendar, User, Mail, DollarSign, MapPin, AlertCircle } from 'lucide-react';
 
 interface Project {
@@ -25,7 +25,7 @@ export default function ViewBudgets() {
 
   const loadProjects = async () => {
     setLoading(true);
-    const { data } = await Database
+    const { data } = await supabase
       .from('projects')
       .select(`
         *,
