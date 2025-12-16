@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bolt Database, Service } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download, Edit2 } from 'lucide-react';
 
 interface BudgetItem {
