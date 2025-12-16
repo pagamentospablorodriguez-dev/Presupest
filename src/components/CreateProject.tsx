@@ -174,21 +174,30 @@ Un cordial saludo.`;
     setSuccess(false);
 
     try {
-      const response = await fetch('/.netlify/functions/generate-project-budget', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          distanceKm: parseFloat(formData.distanceKm),
-          priceAdjustment,
-          emailContent: editingEmail ? emailContent : generateEmailContent(),
-          items: items.map((item) => ({
-            serviceId: item.serviceId,
-            quantity: parseFloat(item.quantity),
-            difficultyFactor: parseFloat(item.difficultyFactor),
-          })),
-        }),
-      });
+
+
+      const finalEmailContent = showPreview && emailContent ? emailContent : generateEmailContent();
+
+const response = await fetch('/.netlify/functions/generate-project-budget', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    ...formData,
+    distanceKm: parseFloat(formData.distanceKm),
+    priceAdjustment,
+    emailContent: finalEmailContent,
+    items: items.map((item) => ({
+      serviceId: item.serviceId,
+      quantity: parseFloat(item.quantity),
+      difficultyFactor: parseFloat(item.difficultyFactor),
+    })),
+  }),
+});
+
+
+
+
+      
 
       const result = await response.json();
 
