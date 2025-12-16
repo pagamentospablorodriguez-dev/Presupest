@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bolt Database } from '../lib/supabase';
+import { Database } from '../lib/supabase';
 import { Send, Loader2, CheckCircle } from 'lucide-react';
 
 interface Project {
