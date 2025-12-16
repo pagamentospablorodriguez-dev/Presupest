@@ -224,10 +224,16 @@ Un cordial saludo.`;
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-t-lg shadow-lg">
-        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest Pro - Automatiza Tus Presupuestos</h2>
+        <h2 className="text-3xl font-bold mb-3">
+  🏗️ Presupest — Presupuestos Profesionales en Minutos
+</h2>
         <p className="text-lg text-blue-50 leading-relaxed">
-          De la <strong>visita técnica al email profesional</strong> en <strong>2 minutos</strong>. Sistema con <strong>análisis inteligente</strong> que calcula complejidades automáticamente. Presupuestos <strong>multi-servicio editables</strong> antes de enviar. Profesionalidad total, cero errores, máxima velocidad.
-        </p>
+  De la <strong>visita técnica al presupuesto listo para enviar</strong> en <strong>2 minutos</strong>.
+  Presupuestos <strong>multi-servicio</strong> con cálculo automático de precios, 
+  <strong>análisis inteligente de dificultad</strong> y generación de <strong>PDF profesional</strong>.
+  Un sistema creado para profesionales que <strong>cierran obras, no pierden tiempo</strong>.
+  Tus clientes reciben presupuestos que <strong>transmiten confianza, justifican el precio y convierten</strong>.
+</p>
       </div>
 
       <div className="bg-white shadow-md rounded-b-lg p-6">
