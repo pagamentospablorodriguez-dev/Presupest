@@ -42,7 +42,23 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const data: ProjectRequest = JSON.parse(event.body || '{}');
+
+
+
+    interface ProjectRequest {
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  projectName: string;
+  distanceKm: number;
+  priceAdjustment: number;
+  clientObservations?: string;
+  emailContent?: string; // Adicionado
+  items: BudgetItem[];
+}
+
+const data: ProjectRequest = JSON.parse(event.body || '{}');
+
 
     /* ────────────────────────────────────────── */
     /* CLIENTE                                    */
@@ -292,12 +308,20 @@ async function sendEmail(
       },
     });
 
+
+
+
     await transporter.sendMail({
-      from: `"Presupuestos" <${gmailUser}>`,
-      to: to,
-      subject: `Presupuesto: ${project} - ${name}`,
-      text: content,
-    });
+  from: `"Presupuestos" <${gmailUser}>`,
+  to: to,
+  subject: `Presupuesto: ${project} - ${name}`,
+  text: content, // content já vem editado ou não do frontend
+});
+
+
+
+
+    
 
     return true;
   } catch (error) {
