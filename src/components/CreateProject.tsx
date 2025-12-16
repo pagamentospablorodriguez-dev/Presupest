@@ -229,10 +229,10 @@ Un cordial saludo.`;
 </h2>
         <p className="text-lg text-blue-50 leading-relaxed">
   De la <strong>visita técnica al presupuesto listo para enviar</strong> en <strong>2 minutos</strong>.
-  Presupuestos <strong>multi-servicio</strong> con cálculo automático de precios, 
-  <strong>análisis inteligente de dificultad</strong> y generación de <strong>PDF profesional</strong>.
-  Un sistema creado para profesionales que <strong>cierran obras, no pierden tiempo</strong>.
-  Tus clientes reciben presupuestos que <strong>transmiten confianza, justifican el precio y convierten</strong>.
+  Presupuestos <strong>multi-servicio</strong> con cálculo automático de precios y 
+  <strong>análisis inteligente de complejidad</strong>.
+  Un sistema diseñado para profesionales que <strong>cierran obras, no pierden tiempo</strong>.
+  Presupuestos claros, profesionales y listos para enviar por email.
 </p>
       </div>
 
