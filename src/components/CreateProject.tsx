@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Bolt Database, Service } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { Database } from '../lib/supabase';
+import { jsPDF } from 'jspdf';
+
 import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download } from 'lucide-react';
+
+type Service = Database['public']['Tables']['services']['Row'];
+
 
 interface BudgetItem {
   serviceId: string;
@@ -155,7 +161,7 @@ Un cordial saludo.
   };
 
   const downloadPDF = () => {
-    const { jsPDF } = require('jspdf');
+    
     const doc = new jsPDF();
 
     doc.setFillColor(30, 58, 138);
