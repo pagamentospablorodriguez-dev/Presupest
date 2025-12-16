@@ -431,7 +431,10 @@ Un cordial saludo.`;
             )}
           </div>
 
-          {showPreview && (
+
+          
+
+                    {showPreview && (
             <div className="bg-gray-100 p-4 rounded-md border border-gray-300">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-bold text-gray-900">VISTA PREVIA DEL EMAIL</h4>
@@ -456,6 +459,9 @@ Un cordial saludo.`;
                   {emailContent}
                 </div>
               )}
+              {editingEmail && (
+                <p className="text-xs text-amber-600 mt-2">⚠️ Has editado manualmente. Si actualizas el preview, perderás los cambios.</p>
+              )}
             </div>
           )}
 
@@ -463,7 +469,8 @@ Un cordial saludo.`;
             <button
               type="button"
               onClick={handlePreview}
-              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
+              disabled={editingEmail}
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               <Eye className="h-5 w-5" />
               <span>{showPreview ? 'Actualizar' : 'Ver'} Preview</span>
@@ -486,6 +493,13 @@ Un cordial saludo.`;
               )}
             </button>
           </div>
+
+
+
+
+          
+
+          
         </form>
       </div>
     </div>
