@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Send, Loader2, CheckCircle } from 'lucide-react';
 
 interface Project {
@@ -22,7 +22,7 @@ export default function RespondEmail() {
   }, []);
 
   const loadSentProjects = async () => {
-    const { data } = await Database
+    const { data } = await supabase
       .from('projects')
       .select(`
         *,
