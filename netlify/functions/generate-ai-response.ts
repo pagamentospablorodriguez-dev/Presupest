@@ -13,31 +13,39 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ error: 'IA no configurada' }) };
     }
 
-    const prompt = `Eres un profesional de construcción en Barcelona respondiendo a una objeción de precio.
+    const prompt = `Eres un profesional experimentado de construcción en Barcelona respondiendo a una objeción de precio de un cliente.
 
-CONTEXTO REAL:
+DATOS REALES:
 - Cliente: ${clientName}
 - Proyecto: ${projectName}
-- Presupuesto: ${totalPrice}€
-- Distancia: ${distanceKm} km
+- Presupuesto presentado: ${totalPrice}€
+- Distancia del trabajo: ${distanceKm} km
 - Objeción del cliente: "${clientMessage}"
 
 INSTRUCCIONES CRÍTICAS:
-1. NO inventes información que no conoces (herramientas, garantías, técnicas)
-2. SÉ FACTUAL: solo habla de lo que está en el contexto
-3. Usa argumentos genéricos pero reales (calidad, experiencia, responsabilidad)
-4. NO uses placeholders como [Tu Nombre] o [Tu Empresa]
-5. Termina con "Un cordial saludo" (sin firma)
+1. SÉ FACTUAL: No inventes información técnica específica (herramientas, marcas, garantías legales concretas)
+2. USA ARGUMENTOS GENÉRICOS PERO REALES: calidad, experiencia, cumplimiento de plazos, responsabilidad profesional
+3. NO uses placeholders como [Tu Nombre], [Tu Empresa], [Contacto]
+4. SÉ PERSUASIVO SIN MENTIR: Explica el valor real del precio sin inventar detalles
+5. COMPARA con competencia de forma inteligente: "Precios muy bajos suelen significar..." (sin inventar datos)
+6. OFRECE FLEXIBILIDAD: Abierto a diálogo para ajustar alcance si es necesario
 
-ESTRUCTURA:
-- Saludo empático
-- Explica el valor del precio de forma honesta
-- Destaca: calidad de trabajo, experiencia, seriedad profesional
-- Compara con competencia (sin detalles inventados)
-- Ofrece diálogo para ajustar alcance si es necesario
-- Cierre profesional
+ESTRUCTURA OBLIGATORIA:
+1. Saludo empático y profesional
+2. Agradecimiento por la confianza
+3. Explicación honesta del valor del precio:
+   - Calidad de materiales (sin especificar marcas si no las conoces)
+   - Experiencia profesional
+   - Seriedad y cumplimiento de plazos
+   - Responsabilidad (sin inventar garantías específicas)
+4. Comparación inteligente con competencia barata (enfoque en riesgos de precios muy bajos)
+5. Apertura al diálogo: "Si deseas ajustar el alcance del proyecto..."
+6. Cierre: "Un cordial saludo" (SIN firma, SIN placeholders)
 
-Responde SOLO el texto del email, directo para copiar y pegar.`;
+TONO: Profesional, cercano, confiado pero no arrogante, persuasivo sin presionar.
+
+Responde SOLO el texto del email, directo para copiar y enviar al cliente.`;
+
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
