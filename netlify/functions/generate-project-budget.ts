@@ -166,28 +166,40 @@ const data: ProjectRequest = JSON.parse(event.body || '{}');
     /* ────────────────────────────────────────── */
     /* EMAIL                                      */
     /* ────────────────────────────────────────── */
-    const emailContent = generateConsolidatedEmail(
-      data.clientName,
-      data.projectName,
-      itemsDetails,
-      data.distanceKm,
-      distanceFee,
-      Number(projectData.total_price),
-      data.observations || ''
-    );
 
-    await supabaseAdmin.from('email_history').insert({
-      budget_id: project.data!.id,
-      type: 'proposal',
-      content: emailContent,
-    });
 
-    const emailSent = await sendEmail(
-      data.clientEmail,
-      data.clientName,
-      data.projectName,
-      emailContent
-    );
+
+
+
+    const emailContent = data.emailContent || generateConsolidatedEmail(
+  data.clientName,
+  data.projectName,
+  itemsDetails,
+  data.distanceKm,
+  distanceFee,
+  Number(projectData.total_price),
+  data.clientObservations || ''
+);
+
+await supabaseAdmin.from('email_history').insert({
+  budget_id: project.data!.id,
+  type: 'proposal',
+  content: emailContent,
+});
+
+const emailSent = await sendEmail(
+  data.clientEmail,
+  data.clientName,
+  data.projectName,
+  emailContent
+);
+
+
+
+
+
+
+    
 
     if (emailSent) {
       await supabaseAdmin
