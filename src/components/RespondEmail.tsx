@@ -22,7 +22,7 @@ export default function RespondEmail() {
   }, []);
 
   const loadSentProjects = async () => {
-    const { data } = await Bolt Database
+    const { data } = await Database
       .from('projects')
       .select(`
         *,
