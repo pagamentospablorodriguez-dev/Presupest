@@ -1,18 +1,12 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import type { Database } from '../lib/supabase';
-import { jsPDF } from 'jspdf';
-
-import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download } from 'lucide-react';
-
-type Service = Database['public']['Tables']['services']['Row'];
-
+import { Bolt Database, Service } from '../lib/supabase';
+import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download, Edit2 } from 'lucide-react';
 
 interface BudgetItem {
   serviceId: string;
   quantity: string;
   difficultyFactor: string;
-  customNotes: string;
+  internalNotes: string;
 }
 
 export default function CreateProject() {
@@ -21,8 +15,11 @@ export default function CreateProject() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailContent, setEmailContent] = useState('');
   const [priceAdjustment, setPriceAdjustment] = useState(0);
   const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [analyzingIA, setAnalyzingIA] = useState(false);
 
   const [formData, setFormData] = useState({
     clientName: '',
@@ -30,11 +27,11 @@ export default function CreateProject() {
     clientPhone: '',
     projectName: 'Reforma integral',
     distanceKm: '',
-    observations: '',
+    clientObservations: '',
   });
 
   const [items, setItems] = useState<BudgetItem[]>([
-    { serviceId: '', quantity: '', difficultyFactor: '1.0', customNotes: '' },
+    { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '' },
   ]);
 
   useEffect(() => {
@@ -47,7 +44,7 @@ export default function CreateProject() {
   };
 
   const addItem = () => {
-    setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', customNotes: '' }]);
+    setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '' }]);
   };
 
   const removeItem = (index: number) => {
@@ -79,18 +76,23 @@ export default function CreateProject() {
   };
 
   const analyzeObservations = async () => {
-    if (!formData.observations.trim()) {
+    if (!formData.clientObservations.trim() && !items.some(item => item.internalNotes.trim())) {
       setPriceAdjustment(0);
       setAdjustmentReason('');
       return;
     }
 
+    setAnalyzingIA(true);
+
     try {
+      const allNotes = items.map(item => item.internalNotes).filter(n => n).join('. ');
+      const combinedText = `${formData.clientObservations}. ${allNotes}`;
+
       const response = await fetch('/.netlify/functions/analyze-observations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          observations: formData.observations,
+          observations: combinedText,
           baseTotal: parseFloat(calculateTotal()),
         }),
       });
@@ -102,6 +104,8 @@ export default function CreateProject() {
       }
     } catch (err) {
       console.error('Error analyzing observations');
+    } finally {
+      setAnalyzingIA(false);
     }
   };
 
@@ -122,15 +126,13 @@ export default function CreateProject() {
       } else {
         itemsList += ` = ${itemTotal.toFixed(2)}€\n`;
       }
-      if (item.customNotes) itemsList += `   ${item.customNotes}\n`;
       itemsList += '\n';
     });
 
     const distanceKm = parseFloat(formData.distanceKm) || 0;
     const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
 
-    return `
-Estimado/a ${formData.clientName},
+    return `Estimado/a ${formData.clientName},
 
 Tras la visita técnica realizada, le presentamos el presupuesto detallado para su obra.
 
@@ -148,52 +150,21 @@ ${priceAdjustment !== 0 ? `Ajuste por complejidad:                      ${priceA
 IMPORTE TOTAL:                             ${calculateTotal()}€
 ═══════════════════════════════════════════════════════════
 
-${formData.observations ? `OBSERVACIONES:\n${formData.observations}\n\n` : ''}
+${formData.clientObservations ? `OBSERVACIONES:\n${formData.clientObservations}\n\n` : ''}
 ✓ Presupuesto elaborado tras visita técnica
-✓ Materiales de primera calidad incluidos
-✓ Garantía de todos los trabajos realizados
+✓ Materiales de calidad incluidos
+✓ Garantía del trabajo realizado
 ✓ Validez del presupuesto: 15 días
 
-Quedamos a su entera disposición para cualquier consulta.
+Quedamos a su disposición para cualquier consulta.
 
-Un cordial saludo.
-    `.trim();
+Un cordial saludo.`;
   };
 
-  const downloadPDF = () => {
-    
-    const doc = new jsPDF();
-
-    doc.setFillColor(30, 58, 138);
-    doc.rect(0, 0, 210, 30, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text('PRESUPUESTO', 15, 20);
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    doc.text(`${formData.projectName}`, 15, 50);
-    doc.text(`Cliente: ${formData.clientName}`, 15, 60);
-    doc.text(`Email: ${formData.clientEmail}`, 15, 70);
-
-    let y = 85;
-    items.forEach((item) => {
-      const service = services.find((s) => s.id === item.serviceId);
-      if (!service) return;
-      const basePrice = parseFloat(service.base_price);
-      const quantity = parseFloat(item.quantity);
-      const difficulty = parseFloat(item.difficultyFactor);
-      const itemTotal = (basePrice * quantity) * difficulty;
-
-      doc.text(`${service.name}`, 15, y);
-      doc.text(`${quantity} ${service.unit} × ${basePrice}€ = ${itemTotal.toFixed(2)}€`, 15, y + 5);
-      y += 12;
-    });
-
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: ${calculateTotal()}€`, 15, y + 10);
-
-    doc.save(`presupuesto_${formData.clientName}.pdf`);
+  const handlePreview = () => {
+    setEmailContent(generateEmailContent());
+    setShowPreview(true);
+    setEditingEmail(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -210,11 +181,11 @@ Un cordial saludo.
           ...formData,
           distanceKm: parseFloat(formData.distanceKm),
           priceAdjustment,
+          emailContent: editingEmail ? emailContent : generateEmailContent(),
           items: items.map((item) => ({
             serviceId: item.serviceId,
             quantity: parseFloat(item.quantity),
             difficultyFactor: parseFloat(item.difficultyFactor),
-            customNotes: item.customNotes,
           })),
         }),
       });
@@ -229,11 +200,12 @@ Un cordial saludo.
           clientPhone: '',
           projectName: 'Reforma integral',
           distanceKm: '',
-          observations: '',
+          clientObservations: '',
         });
-        setItems([{ serviceId: '', quantity: '', difficultyFactor: '1.0', customNotes: '' }]);
+        setItems([{ serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '' }]);
         setPriceAdjustment(0);
         setShowPreview(false);
+        setEditingEmail(false);
       } else {
         setError(result.error || 'Error al generar presupuesto');
       }
@@ -252,12 +224,9 @@ Un cordial saludo.
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-t-lg shadow-lg">
-        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest - Automatiza Tus Presupuestos</h2>
+        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest Pro - Automatiza Tus Presupuestos</h2>
         <p className="text-lg text-blue-50 leading-relaxed">
-          De la <strong>visita técnica al email profesional</strong> en <strong>2 minutos</strong>. 
-          Presupuestos <strong>multi-servicio</strong> con cálculo automático, análisis inteligente de complejidad y PDF. 
-          Un sistema diseñado para profesionales que <strong>cierran obras, no pierden tiempo</strong>. 
-          Tus clientes reciben presupuestos que <strong>impactan, convencen y cierran</strong>.
+          De la <strong>visita técnica al email profesional</strong> en <strong>2 minutos</strong>. Sistema con <strong>análisis inteligente</strong> que calcula complejidades automáticamente. Presupuestos <strong>multi-servicio editables</strong> antes de enviar. Profesionalidad total, cero errores, máxima velocidad.
         </p>
       </div>
 
@@ -265,7 +234,7 @@ Un cordial saludo.
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md flex items-center">
             <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-            <span className="text-green-800">¡Presupuesto generado, analizado y enviado con éxito!</span>
+            <span className="text-green-800">¡Presupuesto enviado con éxito!</span>
           </div>
         )}
 
@@ -399,13 +368,15 @@ Un cordial saludo.
                     </select>
                   </div>
                   <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nota</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nota Interna <span className="text-xs text-gray-500">(No va en email)</span>
+                    </label>
                     <input
                       type="text"
-                      value={item.customNotes}
-                      onChange={(e) => updateItem(index, 'customNotes', e.target.value)}
+                      value={item.internalNotes}
+                      onChange={(e) => updateItem(index, 'internalNotes', e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                      placeholder="Opcional"
+                      placeholder="Ej: Difícil acceso, refuerzo extra"
                     />
                   </div>
                   <div className="md:col-span-1 flex items-end">
@@ -425,17 +396,20 @@ Un cordial saludo.
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones Generales</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Observaciones para el Cliente <span className="text-xs text-gray-500">(Aparecerán en el email)</span>
+            </label>
             <textarea
               rows={3}
-              value={formData.observations}
-              onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+              value={formData.clientObservations}
+              onChange={(e) => setFormData({ ...formData, clientObservations: e.target.value })}
               onBlur={analyzeObservations}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="Detalles adicionales, obstáculos, complejidades especiales..."
+              placeholder="Información adicional que verá el cliente en el presupuesto..."
             />
+            {analyzingIA && <p className="text-sm text-blue-600 mt-2">🤖 IA analizando complejidad...</p>}
             {adjustmentReason && (
-              <p className="text-sm text-blue-600 mt-2">💡 {adjustmentReason}</p>
+              <p className="text-sm text-blue-600 mt-2">✅ IA detectó: {adjustmentReason}</p>
             )}
           </div>
 
@@ -446,36 +420,47 @@ Un cordial saludo.
             </div>
             {priceAdjustment !== 0 && (
               <p className="text-sm text-blue-600 mt-2">
-                Ajuste por observaciones: {priceAdjustment > 0 ? '+' : ''}{priceAdjustment.toFixed(2)}€
+                Ajuste IA: {priceAdjustment > 0 ? '+' : ''}{priceAdjustment.toFixed(2)}€
               </p>
             )}
           </div>
 
           {showPreview && (
-            <div className="bg-gray-100 p-4 rounded-md border border-gray-300 max-h-96 overflow-y-auto">
-              <h4 className="font-bold mb-3 text-gray-900">VISTA PREVIA DEL EMAIL</h4>
-              <div className="bg-white p-4 rounded text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                {generateEmailContent()}
+            <div className="bg-gray-100 p-4 rounded-md border border-gray-300">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold text-gray-900">VISTA PREVIA DEL EMAIL</h4>
+                <button
+                  type="button"
+                  onClick={() => setEditingEmail(!editingEmail)}
+                  className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span>{editingEmail ? 'Ver' : 'Editar'}</span>
+                </button>
               </div>
+              {editingEmail ? (
+                <textarea
+                  rows={20}
+                  value={emailContent}
+                  onChange={(e) => setEmailContent(e.target.value)}
+                  className="w-full p-4 border border-gray-300 rounded text-sm font-mono"
+                />
+              ) : (
+                <div className="bg-white p-4 rounded text-sm text-gray-700 whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">
+                  {emailContent}
+                </div>
+              )}
             </div>
           )}
 
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setShowPreview(!showPreview)}
+              onClick={handlePreview}
               className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
             >
               <Eye className="h-5 w-5" />
-              <span>{showPreview ? 'Ocultar' : 'Ver'} Preview</span>
-            </button>
-            <button
-              type="button"
-              onClick={downloadPDF}
-              className="flex-1 bg-amber-600 text-white py-2 px-4 rounded-md hover:bg-amber-700 flex items-center justify-center space-x-2"
-            >
-              <Download className="h-5 w-5" />
-              <span>Descargar PDF</span>
+              <span>{showPreview ? 'Actualizar' : 'Ver'} Preview</span>
             </button>
             <button
               type="submit"
@@ -500,3 +485,4 @@ Un cordial saludo.
     </div>
   );
 }
+
