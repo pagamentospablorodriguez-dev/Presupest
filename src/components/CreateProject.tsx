@@ -1,7 +1,6 @@
-// src/components/CreateProject.tsx
 import { useState, useEffect } from 'react';
-import { supabase, Service } from '../lib/supabase';
-import { Send, Loader2, CheckCircle, Plus, Trash2 } from 'lucide-react';
+import { Bolt Database, Service } from '../lib/supabase';
+import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download } from 'lucide-react';
 
 interface BudgetItem {
   serviceId: string;
@@ -15,6 +14,9 @@ export default function CreateProject() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [priceAdjustment, setPriceAdjustment] = useState(0);
+  const [adjustmentReason, setAdjustmentReason] = useState('');
 
   const [formData, setFormData] = useState({
     clientName: '',
@@ -57,17 +59,135 @@ export default function CreateProject() {
     items.forEach((item) => {
       const service = services.find((s) => s.id === item.serviceId);
       if (service && item.quantity && item.difficultyFactor) {
-        const basePrice = Number(service.base_price);
-        const quantity = Number(item.quantity);
-        const difficulty = Number(item.difficultyFactor);
-        total += basePrice * quantity * difficulty;
+        const basePrice = parseFloat(service.base_price);
+        const quantity = parseFloat(item.quantity);
+        const difficulty = parseFloat(item.difficultyFactor);
+        total += (basePrice * quantity) * difficulty;
       }
     });
 
-    const distanceKm = Number(formData.distanceKm) || 0;
+    const distanceKm = parseFloat(formData.distanceKm) || 0;
     const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
 
-    return (total + distanceFee).toFixed(2);
+    return (total + distanceFee + priceAdjustment).toFixed(2);
+  };
+
+  const analyzeObservations = async () => {
+    if (!formData.observations.trim()) {
+      setPriceAdjustment(0);
+      setAdjustmentReason('');
+      return;
+    }
+
+    try {
+      const response = await fetch('/.netlify/functions/analyze-observations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          observations: formData.observations,
+          baseTotal: parseFloat(calculateTotal()),
+        }),
+      });
+
+      const result = await response.json();
+      if (result.adjustment !== undefined) {
+        setPriceAdjustment(result.adjustment);
+        setAdjustmentReason(result.reason);
+      }
+    } catch (err) {
+      console.error('Error analyzing observations');
+    }
+  };
+
+  const generateEmailContent = () => {
+    let itemsList = '';
+    items.forEach((item, idx) => {
+      const service = services.find((s) => s.id === item.serviceId);
+      if (!service) return;
+      const basePrice = parseFloat(service.base_price);
+      const quantity = parseFloat(item.quantity);
+      const difficulty = parseFloat(item.difficultyFactor);
+      const itemTotal = (basePrice * quantity) * difficulty;
+
+      itemsList += `${idx + 1}. ${service.name}\n`;
+      itemsList += `   ${quantity} ${service.unit} × ${basePrice}€`;
+      if (difficulty > 1) {
+        itemsList += ` × ${difficulty} = ${itemTotal.toFixed(2)}€\n`;
+      } else {
+        itemsList += ` = ${itemTotal.toFixed(2)}€\n`;
+      }
+      if (item.customNotes) itemsList += `   ${item.customNotes}\n`;
+      itemsList += '\n';
+    });
+
+    const distanceKm = parseFloat(formData.distanceKm) || 0;
+    const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
+
+    return `
+Estimado/a ${formData.clientName},
+
+Tras la visita técnica realizada, le presentamos el presupuesto detallado para su obra.
+
+═══════════════════════════════════════════════════════════
+PRESUPUESTO: ${formData.projectName.toUpperCase()}
+═══════════════════════════════════════════════════════════
+
+SERVICIOS INCLUIDOS
+───────────────────────────────────────────────────────────
+
+${itemsList}
+${distanceFee > 0 ? `Gastos de desplazamiento (${distanceKm} km):        ${distanceFee.toFixed(2)}€\n` : ''}
+${priceAdjustment !== 0 ? `Ajuste por complejidad:                      ${priceAdjustment > 0 ? '+' : ''}${priceAdjustment.toFixed(2)}€\n` : ''}
+═══════════════════════════════════════════════════════════
+IMPORTE TOTAL:                             ${calculateTotal()}€
+═══════════════════════════════════════════════════════════
+
+${formData.observations ? `OBSERVACIONES:\n${formData.observations}\n\n` : ''}
+✓ Presupuesto elaborado tras visita técnica
+✓ Materiales de primera calidad incluidos
+✓ Garantía de todos los trabajos realizados
+✓ Validez del presupuesto: 15 días
+
+Quedamos a su entera disposición para cualquier consulta.
+
+Un cordial saludo.
+    `.trim();
+  };
+
+  const downloadPDF = () => {
+    const { jsPDF } = require('jspdf');
+    const doc = new jsPDF();
+
+    doc.setFillColor(30, 58, 138);
+    doc.rect(0, 0, 210, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text('PRESUPUESTO', 15, 20);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text(`${formData.projectName}`, 15, 50);
+    doc.text(`Cliente: ${formData.clientName}`, 15, 60);
+    doc.text(`Email: ${formData.clientEmail}`, 15, 70);
+
+    let y = 85;
+    items.forEach((item) => {
+      const service = services.find((s) => s.id === item.serviceId);
+      if (!service) return;
+      const basePrice = parseFloat(service.base_price);
+      const quantity = parseFloat(item.quantity);
+      const difficulty = parseFloat(item.difficultyFactor);
+      const itemTotal = (basePrice * quantity) * difficulty;
+
+      doc.text(`${service.name}`, 15, y);
+      doc.text(`${quantity} ${service.unit} × ${basePrice}€ = ${itemTotal.toFixed(2)}€`, 15, y + 5);
+      y += 12;
+    });
+
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: ${calculateTotal()}€`, 15, y + 10);
+
+    doc.save(`presupuesto_${formData.clientName}.pdf`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,11 +202,12 @@ export default function CreateProject() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          distanceKm: Number(formData.distanceKm),
+          distanceKm: parseFloat(formData.distanceKm),
+          priceAdjustment,
           items: items.map((item) => ({
             serviceId: item.serviceId,
-            quantity: Number(item.quantity),
-            difficultyFactor: Number(item.difficultyFactor),
+            quantity: parseFloat(item.quantity),
+            difficultyFactor: parseFloat(item.difficultyFactor),
             customNotes: item.customNotes,
           })),
         }),
@@ -105,28 +226,32 @@ export default function CreateProject() {
           observations: '',
         });
         setItems([{ serviceId: '', quantity: '', difficultyFactor: '1.0', customNotes: '' }]);
+        setPriceAdjustment(0);
+        setShowPreview(false);
       } else {
         setError(result.error || 'Error al generar presupuesto');
       }
-    } catch {
+    } catch (err) {
       setError('Error al conectar con el servidor');
     } finally {
       setLoading(false);
     }
   };
 
+  const getServiceUnit = (serviceId: string) => {
+    const service = services.find((s) => s.id === serviceId);
+    return service?.unit || '';
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-8 rounded-t-lg shadow-lg">
-        <h2 className="text-3xl font-bold mb-3">
-          🏗️ Presupuesto - Sistema Profesional de Presupuestos
-        </h2>
+        <h2 className="text-3xl font-bold mb-3">🏗️ Presupest Pro - Automatiza Tus Presupuestos</h2>
         <p className="text-lg text-blue-50 leading-relaxed">
-          Crea presupuestos completos post-visita técnica en <strong>2 minutos</strong> en lugar de 30.
-          Todos los servicios de la obra en <strong>un solo email profesional</strong>.
-          <span className="block mt-2 font-semibold text-yellow-300">
-            Ahorra tiempo, gana profesionalidad, cierra más obras.
-          </span>
+          De la <strong>visita técnica al email profesional</strong> en <strong>2 minutos</strong>. 
+          Presupuestos <strong>multi-servicio</strong> con cálculo automático, análisis inteligente de complejidad y PDF. 
+          Un sistema diseñado para profesionales que <strong>cierran obras, no pierden tiempo</strong>. 
+          Tus clientes reciben presupuestos que <strong>impactan, convencen y cierran</strong>.
         </p>
       </div>
 
@@ -134,9 +259,7 @@ export default function CreateProject() {
         {success && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md flex items-center">
             <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-            <span className="text-green-800">
-              ¡Presupuesto generado y enviado con éxito!
-            </span>
+            <span className="text-green-800">¡Presupuesto generado, analizado y enviado con éxito!</span>
           </div>
         )}
 
@@ -147,12 +270,9 @@ export default function CreateProject() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Cliente */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre del Cliente *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Cliente *</label>
               <input
                 type="text"
                 required
@@ -163,9 +283,7 @@ export default function CreateProject() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
               <input
                 type="email"
                 required
@@ -176,9 +294,7 @@ export default function CreateProject() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Teléfono
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
               <input
                 type="tel"
                 value={formData.clientPhone}
@@ -189,12 +305,9 @@ export default function CreateProject() {
             </div>
           </div>
 
-          {/* Proyecto */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre del Proyecto *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Proyecto *</label>
               <input
                 type="text"
                 required
@@ -205,9 +318,7 @@ export default function CreateProject() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Distancia (km) *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distancia (km) *</label>
               <input
                 type="number"
                 step="0.1"
@@ -221,7 +332,6 @@ export default function CreateProject() {
             </div>
           </div>
 
-          {/* Servicios */}
           <div className="border-t pt-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-900">Servicios de la Obra</h3>
@@ -255,7 +365,9 @@ export default function CreateProject() {
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cantidad {getServiceUnit(item.serviceId) && `(${getServiceUnit(item.serviceId)})`} *
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -306,44 +418,77 @@ export default function CreateProject() {
             ))}
           </div>
 
-          {/* Observaciones */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones Generales</label>
             <textarea
               rows={3}
               value={formData.observations}
               onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+              onBlur={analyzeObservations}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="Detalles adicionales de la obra..."
+              placeholder="Detalles adicionales, obstáculos, complejidades especiales..."
             />
+            {adjustmentReason && (
+              <p className="text-sm text-blue-600 mt-2">💡 {adjustmentReason}</p>
+            )}
           </div>
 
-          {/* Total */}
           <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-900">TOTAL PRESUPUESTO:</span>
               <span className="text-2xl font-bold text-blue-700">{calculateTotal()}€</span>
             </div>
+            {priceAdjustment !== 0 && (
+              <p className="text-sm text-blue-600 mt-2">
+                Ajuste por observaciones: {priceAdjustment > 0 ? '+' : ''}{priceAdjustment.toFixed(2)}€
+              </p>
+            )}
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Generando presupuesto completo...</span>
-              </>
-            ) : (
-              <>
-                <Send className="h-5 w-5" />
-                <span>Generar y Enviar Presupuesto Completo</span>
-              </>
-            )}
-          </button>
+          {showPreview && (
+            <div className="bg-gray-100 p-4 rounded-md border border-gray-300 max-h-96 overflow-y-auto">
+              <h4 className="font-bold mb-3 text-gray-900">VISTA PREVIA DEL EMAIL</h4>
+              <div className="bg-white p-4 rounded text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                {generateEmailContent()}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreview(!showPreview)}
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
+            >
+              <Eye className="h-5 w-5" />
+              <span>{showPreview ? 'Ocultar' : 'Ver'} Preview</span>
+            </button>
+            <button
+              type="button"
+              onClick={downloadPDF}
+              className="flex-1 bg-amber-600 text-white py-2 px-4 rounded-md hover:bg-amber-700 flex items-center justify-center space-x-2"
+            >
+              <Download className="h-5 w-5" />
+              <span>Descargar PDF</span>
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5" />
+                  <span>Enviar Presupuesto</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
