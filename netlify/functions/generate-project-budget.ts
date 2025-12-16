@@ -109,7 +109,7 @@ export const handler: Handler = async (event) => {
       data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
 
     /* ────────────────────────────────────────── */
-    /* PROJECT DATA (COMO PEDIDO)                 */
+    /* PROJECT DATA                               */
     /* ────────────────────────────────────────── */
     const projectData = {
       client_id: clientId,
@@ -265,7 +265,7 @@ Un cordial saludo.
 }
 
 /* ────────────────────────────────────────────── */
-/* SEND EMAIL                                     */
+/* SEND EMAIL (GMAIL / NODEMAILER)                 */
 /* ────────────────────────────────────────────── */
 async function sendEmail(
   to: string,
@@ -273,28 +273,35 @@ async function sendEmail(
   project: string,
   content: string
 ): Promise<boolean> {
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) return false;
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+
+  if (!gmailUser || !gmailPass) {
+    console.warn('Gmail não configurado');
+    return false;
+  }
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${resendApiKey}`,
+    const nodemailer = require('nodemailer');
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailPass,
       },
-      body: JSON.stringify({
-        from:
-          process.env.EMAIL_FROM ||
-          'Presupuestos <presupuestos@tuempresa.com>',
-        to: [to],
-        subject: `Presupuesto: ${project} - ${name}`,
-        text: content,
-      }),
     });
 
-    return response.ok;
-  } catch {
+    await transporter.sendMail({
+      from: `"Presupuestos" <${gmailUser}>`,
+      to: to,
+      subject: `Presupuesto: ${project} - ${name}`,
+      text: content,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error enviando email:', error);
     return false;
   }
 }
