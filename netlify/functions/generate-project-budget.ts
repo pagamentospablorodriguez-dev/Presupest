@@ -1,10 +1,17 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js'; // Import correto
+import { createClient } from '@supabase/supabase-js';
 
+/* ────────────────────────────────────────────── */
+/* SUPABASE ADMIN CLIENT                          */
+/* ────────────────────────────────────────────── */
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey); // Nome válido
 
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+/* ────────────────────────────────────────────── */
+/* TYPES                                          */
+/* ────────────────────────────────────────────── */
 interface BudgetItem {
   serviceId: string;
   quantity: number;
@@ -19,25 +26,35 @@ interface ProjectRequest {
   projectName: string;
   distanceKm: number;
   observations?: string;
+  priceAdjustment?: number;
   items: BudgetItem[];
 }
 
+/* ────────────────────────────────────────────── */
+/* HANDLER                                        */
+/* ────────────────────────────────────────────── */
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Método no permitido' }) };
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Método no permitido' }),
+    };
   }
 
   try {
     const data: ProjectRequest = JSON.parse(event.body || '{}');
 
-    // Verificar si el cliente existe
-    let existingClient = await supabaseAdmin
+    /* ────────────────────────────────────────── */
+    /* CLIENTE                                    */
+    /* ────────────────────────────────────────── */
+    const existingClient = await supabaseAdmin
       .from('clients')
       .select('*')
       .eq('email', data.clientEmail)
       .maybeSingle();
 
     let clientId: string;
+
     if (!existingClient.data) {
       const newClient = await supabaseAdmin
         .from('clients')
@@ -48,12 +65,15 @@ export const handler: Handler = async (event) => {
         })
         .select()
         .single();
+
       clientId = newClient.data!.id;
     } else {
       clientId = existingClient.data.id;
     }
 
-    // Calcular total de servicios
+    /* ────────────────────────────────────────── */
+    /* SERVICIOS                                  */
+    /* ────────────────────────────────────────── */
     let totalGeneral = 0;
     const itemsDetails: any[] = [];
 
@@ -82,26 +102,41 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Desplazamiento
-    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
-    const totalPrice = totalGeneral + distanceFee;
+    /* ────────────────────────────────────────── */
+    /* DESPLAZAMIENTO                             */
+    /* ────────────────────────────────────────── */
+    const distanceFee =
+      data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
 
-    // Crear proyecto
+    /* ────────────────────────────────────────── */
+    /* PROJECT DATA (COMO PEDIDO)                 */
+    /* ────────────────────────────────────────── */
+    const projectData = {
+      client_id: clientId,
+      project_name: data.projectName,
+      distance_km: data.distanceKm,
+      global_difficulty: 1.0,
+      observations: data.observations || '',
+      total_price: (
+        totalGeneral +
+        distanceFee +
+        (data.priceAdjustment || 0)
+      ).toFixed(2),
+      status: 'pending',
+    };
+
+    /* ────────────────────────────────────────── */
+    /* CREAR PROYECTO                             */
+    /* ────────────────────────────────────────── */
     const project = await supabaseAdmin
       .from('projects')
-      .insert({
-        client_id: clientId,
-        project_name: data.projectName,
-        distance_km: data.distanceKm,
-        global_difficulty: 1.0,
-        observations: data.observations || '',
-        total_price: totalPrice.toFixed(2),
-        status: 'pending',
-      })
+      .insert(projectData)
       .select()
       .single();
 
-    // Guardar items
+    /* ────────────────────────────────────────── */
+    /* ITEMS DEL PRESUPUESTO                      */
+    /* ────────────────────────────────────────── */
     for (let i = 0; i < data.items.length; i++) {
       await supabaseAdmin.from('budget_items').insert({
         project_id: project.data!.id,
@@ -112,14 +147,16 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Generar email
+    /* ────────────────────────────────────────── */
+    /* EMAIL                                      */
+    /* ────────────────────────────────────────── */
     const emailContent = generateConsolidatedEmail(
       data.clientName,
       data.projectName,
       itemsDetails,
       data.distanceKm,
       distanceFee,
-      totalPrice,
+      Number(projectData.total_price),
       data.observations || ''
     );
 
@@ -129,12 +166,20 @@ export const handler: Handler = async (event) => {
       content: emailContent,
     });
 
-    const emailSent = await sendEmail(data.clientEmail, data.clientName, data.projectName, emailContent);
+    const emailSent = await sendEmail(
+      data.clientEmail,
+      data.clientName,
+      data.projectName,
+      emailContent
+    );
 
     if (emailSent) {
       await supabaseAdmin
         .from('projects')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        })
         .eq('id', project.data!.id);
     }
 
@@ -143,15 +188,21 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         success: true,
         projectId: project.data!.id,
-        totalPrice: totalPrice.toFixed(2),
+        totalPrice: projectData.total_price,
         emailSent,
       }),
     };
   } catch (error: any) {
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message }),
+    };
   }
 };
 
+/* ────────────────────────────────────────────── */
+/* EMAIL TEMPLATE                                 */
+/* ────────────────────────────────────────────── */
 function generateConsolidatedEmail(
   clientName: string,
   projectName: string,
@@ -162,14 +213,17 @@ function generateConsolidatedEmail(
   observations: string
 ): string {
   let itemsList = '';
+
   items.forEach((item, idx) => {
     itemsList += `${idx + 1}. ${item.service.name}\n`;
     itemsList += `   ${item.quantity} ${item.service.unit} × ${item.service.base_price}€`;
+
     if (item.difficulty > 1) {
       itemsList += ` × ${item.difficulty} = ${item.itemTotal.toFixed(2)}€\n`;
     } else {
       itemsList += ` = ${item.itemTotal.toFixed(2)}€\n`;
     }
+
     if (item.notes) itemsList += `   ${item.notes}\n`;
     itemsList += '\n';
   });
@@ -187,7 +241,13 @@ SERVICIOS INCLUIDOS
 ───────────────────────────────────────────────────────────
 
 ${itemsList}
-${distanceFee > 0 ? `Gastos de desplazamiento (${distanceKm} km):        ${distanceFee.toFixed(2)}€\n` : ''}
+${
+  distanceFee > 0
+    ? `Gastos de desplazamiento (${distanceKm} km):        ${distanceFee.toFixed(
+        2
+      )}€\n`
+    : ''
+}
 ═══════════════════════════════════════════════════════════
 IMPORTE TOTAL:                             ${totalPrice.toFixed(2)}€
 ═══════════════════════════════════════════════════════════
@@ -201,10 +261,18 @@ ${observations ? `OBSERVACIONES:\n${observations}\n\n` : ''}
 Quedamos a su entera disposición para cualquier consulta.
 
 Un cordial saludo.
-  `.trim();
+`.trim();
 }
 
-async function sendEmail(to: string, name: string, project: string, content: string): Promise<boolean> {
+/* ────────────────────────────────────────────── */
+/* SEND EMAIL                                     */
+/* ────────────────────────────────────────────── */
+async function sendEmail(
+  to: string,
+  name: string,
+  project: string,
+  content: string
+): Promise<boolean> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return false;
 
@@ -216,12 +284,15 @@ async function sendEmail(to: string, name: string, project: string, content: str
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Presupuestos <presupuestos@tuempresa.com>',
+        from:
+          process.env.EMAIL_FROM ||
+          'Presupuestos <presupuestos@tuempresa.com>',
         to: [to],
         subject: `Presupuesto: ${project} - ${name}`,
         text: content,
       }),
     });
+
     return response.ok;
   } catch {
     return false;
