@@ -25,7 +25,7 @@ export default function ViewBudgets() {
 
   const loadProjects = async () => {
     setLoading(true);
-    const { data } = await Bolt Database
+    const { data } = await Database
       .from('projects')
       .select(`
         *,
