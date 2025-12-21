@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Edit2 } from 'lucide-react';
+import { Bolt Database } from '../lib/supabase';
+import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Edit2, FileText } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -23,8 +23,12 @@ export default function CreateProject() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailContent, setEmailContent] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [pdfDataUrl, setPdfDataUrl] = useState('');
+  const [budgetNumber, setBudgetNumber] = useState('150');
 
   const [formData, setFormData] = useState({
     clientName: '',
@@ -103,10 +107,43 @@ export default function CreateProject() {
     return `Buenas tardes ${firstName},\n\nTe envío propuesta de ${formData.projectName}.\n\nUn saludo.`;
   };
 
+  const generateEmailSubject = () => {
+    return `Pressupost ${budgetNumber}/025 - ${formData.projectName}`;
+  };
+
   const handlePreview = () => {
     setEmailContent(generateEmailContent());
+    setEmailSubject(generateEmailSubject());
     setShowPreview(true);
     setEditingEmail(false);
+  };
+
+  const handlePdfPreview = async () => {
+    try {
+      const response = await fetch('/.netlify/functions/generate-pdf-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          distanceKm: parseFloat(formData.distanceKm),
+          budgetNumber: parseInt(budgetNumber),
+          items: items.map((item) => ({
+            serviceId: item.serviceId,
+            quantity: parseFloat(item.quantity),
+            difficultyFactor: parseFloat(item.difficultyFactor),
+            includesItems: item.includesItems.filter(inc => inc.trim() !== ''),
+          })),
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok && result.pdfDataUrl) {
+        setPdfDataUrl(result.pdfDataUrl);
+        setShowPdfPreview(true);
+      }
+    } catch (err) {
+      console.error('Error generating PDF preview');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,6 +154,7 @@ export default function CreateProject() {
 
     try {
       const finalEmailContent = showPreview && emailContent ? emailContent : generateEmailContent();
+      const finalEmailSubject = showPreview && emailSubject ? emailSubject : generateEmailSubject();
 
       const response = await fetch('/.netlify/functions/generate-project-budget', {
         method: 'POST',
@@ -124,7 +162,9 @@ export default function CreateProject() {
         body: JSON.stringify({
           ...formData,
           distanceKm: parseFloat(formData.distanceKm),
+          budgetNumber: parseInt(budgetNumber),
           emailContent: finalEmailContent,
+          emailSubject: finalEmailSubject,
           items: items.map((item) => ({
             serviceId: item.serviceId,
             quantity: parseFloat(item.quantity),
@@ -148,7 +188,9 @@ export default function CreateProject() {
         });
         setItems([{ serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] }]);
         setShowPreview(false);
+        setShowPdfPreview(false);
         setEditingEmail(false);
+        setBudgetNumber((parseInt(budgetNumber) + 1).toString());
       } else {
         setError(result.error || 'Error al generar presupuesto');
       }
@@ -188,7 +230,7 @@ export default function CreateProject() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Cliente *</label>
               <input
@@ -215,6 +257,16 @@ export default function CreateProject() {
                 type="tel"
                 value={formData.clientPhone}
                 onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nº Presupuesto *</label>
+              <input
+                type="number"
+                required
+                value={budgetNumber}
+                onChange={(e) => setBudgetNumber(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -388,8 +440,20 @@ export default function CreateProject() {
 
           {showPreview && (
             <div className="bg-gray-100 p-4 rounded-md border border-gray-300">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-bold text-gray-900">VISTA PREVIA DEL EMAIL</h4>
+              <h4 className="font-bold text-gray-900 mb-3">VISTA PREVIA DEL EMAIL</h4>
+              
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Asunto</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded text-sm"
+                />
+              </div>
+
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-700">Contenido</label>
                 <button
                   type="button"
                   onClick={() => setEditingEmail(!editingEmail)}
@@ -414,15 +478,33 @@ export default function CreateProject() {
             </div>
           )}
 
+          {showPdfPreview && pdfDataUrl && (
+            <div className="bg-gray-100 p-4 rounded-md border border-gray-300">
+              <h4 className="font-bold text-gray-900 mb-3">VISTA PREVIA DEL PDF</h4>
+              <iframe
+                src={pdfDataUrl}
+                className="w-full h-96 border border-gray-300 rounded"
+                title="PDF Preview"
+              />
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handlePreview}
-              disabled={editingEmail}
-              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 disabled:bg-gray-400 flex items-center justify-center space-x-2"
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
             >
               <Eye className="h-5 w-5" />
-              <span>{showPreview ? 'Actualizar' : 'Ver'} Preview</span>
+              <span>{showPreview ? 'Actualizar' : 'Ver'} Email</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePdfPreview}
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center space-x-2"
+            >
+              <FileText className="h-5 w-5" />
+              <span>Ver PDF</span>
             </button>
             <button
               type="submit"
