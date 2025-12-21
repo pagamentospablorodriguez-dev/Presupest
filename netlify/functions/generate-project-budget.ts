@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/Bolt Database-js';
+import { createClient } from '@supabase/supabase-js';
 import jsPDF from 'jspdf';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
