@@ -20,6 +20,7 @@ interface ProjectRequest {
   projectName: string;
   distanceKm: number;
   clientObservations?: string;
+  emailContent?: string;
   items: BudgetItem[];
 }
 
@@ -122,11 +123,7 @@ export const handler: Handler = async (event) => {
       data.clientObservations || ''
     );
 
-    const emailContent = `Buenas tardes ${data.clientName.split(' ')[0]},
-
-Te envío propuesta de ${data.projectName}.
-
-Un saludo.`;
+    const emailContent = data.emailContent || `Buenas tardes ${data.clientName.split(' ')[0]},\n\nTe envío propuesta de ${data.projectName}.\n\nUn saludo.`;
 
     await supabaseAdmin.from('email_history').insert({
       budget_id: project.data!.id,
@@ -181,38 +178,50 @@ function generatePDF(
   const dateStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getFullYear()).slice(-2)}`;
 
   doc.setFontSize(9);
-  doc.text('Eduardo Bruno Rodríguez González', 15, 15);
-  doc.text('Calle Tarragona, 27 08570 Torello', 15, 20);
-  doc.text('NIF: 44724261W', 15, 25);
-  doc.text('Teléfono: 637 30 69 32', 15, 30);
-  doc.text('Mail: eduarbruno27@gmail.com', 15, 35);
+  doc.text('Eduardo Bruno Rodríguez González', 14, 15);
+  doc.text('Calle Tarragona, 27 08570 Torello', 14, 20);
+  doc.text('NIF: 44724261W', 14, 25);
+  doc.text('Teléfono: 637 30 69 32', 14, 30);
+  doc.text('Mail: eduarbruno27@gmail.com', 14, 35);
 
   doc.text(clientName, 120, 15);
   doc.text(clientEmail, 120, 20);
   if (clientPhone) doc.text(clientPhone, 120, 25);
 
+  doc.rect(14, 10, 182, 30);
+
   doc.setFontSize(10);
-  doc.text(`Pressupost: ${budgetNumber}/025`, 15, 50);
-  doc.text(dateStr, 120, 50);
+  doc.text(`Pressupost: ${budgetNumber}/025`, 14, 50);
+  doc.text(dateStr, 160, 50);
+
+  doc.rect(14, 45, 182, 7);
 
   doc.setFontSize(9);
-  doc.text('DESCRIPCIÓN', 15, 60);
-  doc.text('TOTAL', 170, 60);
+  doc.setFont(undefined, 'bold');
+  doc.text('DESCRIPCIÓN', 14, 60);
+  doc.text('TOTAL', 180, 60, { align: 'right' });
+  doc.setFont(undefined, 'normal');
+
+  doc.rect(14, 55, 182, 7);
 
   let yPos = 68;
 
   items.forEach((item) => {
     const serviceLine = `${item.quantity} ${item.service.name}`;
-    doc.text(serviceLine, 15, yPos);
-    doc.text(`${item.itemTotal.toFixed(2)} €`, 170, yPos);
+    doc.text(serviceLine, 14, yPos);
+    doc.text(`${item.itemTotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
     yPos += 5;
 
     if (item.includes && item.includes.length > 0) {
       doc.setFontSize(8);
       item.includes.forEach((inc: string) => {
         if (inc.trim()) {
-          doc.text(`  - ${inc}`, 20, yPos);
-          yPos += 4;
+          const includeText = `Opció: ${inc}`;
+          const lines = doc.splitTextToSize(includeText, 160);
+          lines.forEach((line: string) => {
+            doc.text(line, 14, yPos);
+            yPos += 4;
+          });
         }
       });
       doc.setFontSize(9);
@@ -220,25 +229,29 @@ function generatePDF(
   });
 
   if (distanceFee > 0) {
-    doc.text(`Desplaçament (${distanceKm} km)`, 15, yPos);
-    doc.text(`${distanceFee.toFixed(2)} €`, 170, yPos);
+    doc.text(`Desplaçament (${distanceKm} km)`, 14, yPos);
+    doc.text(`${distanceFee.toFixed(2)} €`, 180, yPos, { align: 'right' });
     yPos += 5;
   }
 
   if (observations) {
-    yPos += 5;
+    yPos += 3;
     doc.setFontSize(8);
     const obsLines = doc.splitTextToSize(`*${observations}`, 180);
-    doc.text(obsLines, 15, yPos);
-    yPos += obsLines.length * 4 + 5;
+    obsLines.forEach((line: string) => {
+      doc.text(line, 14, yPos);
+      yPos += 4;
+    });
+    doc.setFontSize(9);
+    yPos += 3;
   }
 
-  yPos += 10;
-  doc.text('Mètode de pagament: Transferencia bancaria.', 15, yPos);
   yPos += 5;
-  doc.text('Entidad: Banco Santander', 15, yPos);
+  doc.text('Mètode de pagament: Transferencia bancaria.', 14, yPos);
   yPos += 5;
-  doc.text('IBAN: ES19 0049 6783 9726 9504 4312', 15, yPos);
+  doc.text('Entidad: Banco Santander', 14, yPos);
+  yPos += 5;
+  doc.text('IBAN: ES19 0049 6783 9726 9504 4312', 14, yPos);
 
   yPos += 15;
   const subtotal = total;
@@ -246,15 +259,15 @@ function generatePDF(
   const totalTotal = subtotal + iva;
 
   doc.setFontSize(10);
-  doc.text('SUB-TOTAL', 130, yPos);
-  doc.text(`${subtotal.toFixed(2)} €`, 170, yPos);
+  doc.text('SUB-TOTAL', 140, yPos);
+  doc.text(`${subtotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
   yPos += 6;
-  doc.text('IVA 21%', 130, yPos);
-  doc.text(`${iva.toFixed(2)} €`, 170, yPos);
+  doc.text('IVA 21%', 140, yPos);
+  doc.text(`${iva.toFixed(2)} €`, 180, yPos, { align: 'right' });
   yPos += 6;
   doc.setFont(undefined, 'bold');
-  doc.text('TOTAL TOTAL', 130, yPos);
-  doc.text(`${totalTotal.toFixed(2)} €`, 170, yPos);
+  doc.text('TOTAL TOTAL', 140, yPos);
+  doc.text(`${totalTotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
 
   return doc.output('datauristring').split(',')[1];
 }
