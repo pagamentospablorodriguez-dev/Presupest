@@ -1,22 +1,16 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/Bolt Database-js';
+import jsPDF from 'jspdf';
 
-/* ────────────────────────────────────────────── */
-/* SUPABASE ADMIN CLIENT                          */
-/* ────────────────────────────────────────────── */
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-/* ────────────────────────────────────────────── */
-/* TYPES                                          */
-/* ────────────────────────────────────────────── */
 interface BudgetItem {
   serviceId: string;
   quantity: number;
   difficultyFactor: number;
-  customNotes?: string;
+  includesItems?: string[];
 }
 
 interface ProjectRequest {
@@ -25,44 +19,18 @@ interface ProjectRequest {
   clientPhone?: string;
   projectName: string;
   distanceKm: number;
-  observations?: string;
-  priceAdjustment?: number;
+  clientObservations?: string;
   items: BudgetItem[];
 }
 
-/* ────────────────────────────────────────────── */
-/* HANDLER                                        */
-/* ────────────────────────────────────────────── */
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Método no permitido' }),
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Método no permitido' }) };
   }
 
   try {
+    const data: ProjectRequest = JSON.parse(event.body || '{}');
 
-
-
-    interface ProjectRequest {
-  clientName: string;
-  clientEmail: string;
-  clientPhone?: string;
-  projectName: string;
-  distanceKm: number;
-  priceAdjustment: number;
-  clientObservations?: string;
-  emailContent?: string; // Adicionado
-  items: BudgetItem[];
-}
-
-const data: ProjectRequest = JSON.parse(event.body || '{}');
-
-
-    /* ────────────────────────────────────────── */
-    /* CLIENTE                                    */
-    /* ────────────────────────────────────────── */
     const existingClient = await supabaseAdmin
       .from('clients')
       .select('*')
@@ -70,7 +38,6 @@ const data: ProjectRequest = JSON.parse(event.body || '{}');
       .maybeSingle();
 
     let clientId: string;
-
     if (!existingClient.data) {
       const newClient = await supabaseAdmin
         .from('clients')
@@ -81,15 +48,11 @@ const data: ProjectRequest = JSON.parse(event.body || '{}');
         })
         .select()
         .single();
-
       clientId = newClient.data!.id;
     } else {
       clientId = existingClient.data.id;
     }
 
-    /* ────────────────────────────────────────── */
-    /* SERVICIOS                                  */
-    /* ────────────────────────────────────────── */
     let totalGeneral = 0;
     const itemsDetails: any[] = [];
 
@@ -105,7 +68,6 @@ const data: ProjectRequest = JSON.parse(event.body || '{}');
       const basePrice = Number(service.data.base_price);
       const quantity = Number(item.quantity);
       const difficulty = Number(item.difficultyFactor);
-
       const itemTotal = basePrice * quantity * difficulty;
       totalGeneral += itemTotal;
 
@@ -114,100 +76,77 @@ const data: ProjectRequest = JSON.parse(event.body || '{}');
         quantity,
         difficulty,
         itemTotal,
-        notes: item.customNotes || '',
+        includes: item.includesItems || [],
       });
     }
 
-    /* ────────────────────────────────────────── */
-    /* DESPLAZAMIENTO                             */
-    /* ────────────────────────────────────────── */
-    const distanceFee =
-      data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+    const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
+    totalGeneral += distanceFee;
 
-    /* ────────────────────────────────────────── */
-    /* PROJECT DATA                               */
-    /* ────────────────────────────────────────── */
+    const budgetNumberResult = await supabaseAdmin.rpc('nextval', { sequence_name: 'budget_number_seq' });
+    const budgetNumber = budgetNumberResult.data || 150;
+
     const projectData = {
       client_id: clientId,
       project_name: data.projectName,
       distance_km: data.distanceKm,
       global_difficulty: 1.0,
-      observations: data.observations || '',
-      total_price: (
-        totalGeneral +
-        distanceFee +
-        (data.priceAdjustment || 0)
-      ).toFixed(2),
+      observations: data.clientObservations || '',
+      total_price: totalGeneral.toFixed(2),
       status: 'pending',
+      budget_number: budgetNumber,
     };
 
-    /* ────────────────────────────────────────── */
-    /* CREAR PROYECTO                             */
-    /* ────────────────────────────────────────── */
-    const project = await supabaseAdmin
-      .from('projects')
-      .insert(projectData)
-      .select()
-      .single();
+    const project = await supabaseAdmin.from('projects').insert(projectData).select().single();
 
-    /* ────────────────────────────────────────── */
-    /* ITEMS DEL PRESUPUESTO                      */
-    /* ────────────────────────────────────────── */
     for (let i = 0; i < data.items.length; i++) {
       await supabaseAdmin.from('budget_items').insert({
         project_id: project.data!.id,
         service_id: data.items[i].serviceId,
         quantity: data.items[i].quantity,
-        custom_notes: data.items[i].customNotes || '',
+        custom_notes: '',
         subtotal: itemsDetails[i].itemTotal,
+        includes_items: data.items[i].includesItems || [],
       });
     }
 
-    /* ────────────────────────────────────────── */
-    /* EMAIL                                      */
-    /* ────────────────────────────────────────── */
+    const pdfBase64 = generatePDF(
+      data.clientName,
+      data.clientEmail,
+      data.clientPhone || '',
+      budgetNumber,
+      itemsDetails,
+      distanceFee,
+      data.distanceKm,
+      totalGeneral,
+      data.clientObservations || ''
+    );
 
+    const emailContent = `Buenas tardes ${data.clientName.split(' ')[0]},
 
+Te envío propuesta de ${data.projectName}.
 
+Un saludo.`;
 
+    await supabaseAdmin.from('email_history').insert({
+      budget_id: project.data!.id,
+      type: 'proposal',
+      content: emailContent,
+    });
 
-    const emailContent = data.emailContent || generateConsolidatedEmail(
-  data.clientName,
-  data.projectName,
-  itemsDetails,
-  data.distanceKm,
-  distanceFee,
-  Number(projectData.total_price),
-  data.clientObservations || ''
-);
-
-await supabaseAdmin.from('email_history').insert({
-  budget_id: project.data!.id,
-  type: 'proposal',
-  content: emailContent,
-});
-
-const emailSent = await sendEmail(
-  data.clientEmail,
-  data.clientName,
-  data.projectName,
-  emailContent
-);
-
-
-
-
-
-
-    
+    const emailSent = await sendEmailWithPDF(
+      data.clientEmail,
+      data.clientName,
+      data.projectName,
+      emailContent,
+      pdfBase64,
+      budgetNumber
+    );
 
     if (emailSent) {
       await supabaseAdmin
         .from('projects')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-        })
+        .update({ status: 'sent', sent_at: new Date().toISOString() })
         .eq('id', project.data!.id);
     }
 
@@ -221,119 +160,141 @@ const emailSent = await sendEmail(
       }),
     };
   } catch (error: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
-/* ────────────────────────────────────────────── */
-/* EMAIL TEMPLATE                                 */
-/* ────────────────────────────────────────────── */
-function generateConsolidatedEmail(
+function generatePDF(
   clientName: string,
-  projectName: string,
+  clientEmail: string,
+  clientPhone: string,
+  budgetNumber: number,
   items: any[],
-  distanceKm: number,
   distanceFee: number,
-  totalPrice: number,
+  distanceKm: number,
+  total: number,
   observations: string
 ): string {
-  let itemsList = '';
+  const doc = new jsPDF();
 
-  items.forEach((item, idx) => {
-    itemsList += `${idx + 1}. ${item.service.name}\n`;
-    itemsList += `   ${item.quantity} ${item.service.unit} × ${item.service.base_price}€`;
+  const today = new Date();
+  const dateStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getFullYear()).slice(-2)}`;
 
-    if (item.difficulty > 1) {
-      itemsList += ` × ${item.difficulty} = ${item.itemTotal.toFixed(2)}€\n`;
-    } else {
-      itemsList += ` = ${item.itemTotal.toFixed(2)}€\n`;
+  doc.setFontSize(9);
+  doc.text('Eduardo Bruno Rodríguez González', 15, 15);
+  doc.text('Calle Tarragona, 27 08570 Torello', 15, 20);
+  doc.text('NIF: 44724261W', 15, 25);
+  doc.text('Teléfono: 637 30 69 32', 15, 30);
+  doc.text('Mail: eduarbruno27@gmail.com', 15, 35);
+
+  doc.text(clientName, 120, 15);
+  doc.text(clientEmail, 120, 20);
+  if (clientPhone) doc.text(clientPhone, 120, 25);
+
+  doc.setFontSize(10);
+  doc.text(`Pressupost: ${budgetNumber}/025`, 15, 50);
+  doc.text(dateStr, 120, 50);
+
+  doc.setFontSize(9);
+  doc.text('DESCRIPCIÓN', 15, 60);
+  doc.text('TOTAL', 170, 60);
+
+  let yPos = 68;
+
+  items.forEach((item) => {
+    const serviceLine = `${item.quantity} ${item.service.name}`;
+    doc.text(serviceLine, 15, yPos);
+    doc.text(`${item.itemTotal.toFixed(2)} €`, 170, yPos);
+    yPos += 5;
+
+    if (item.includes && item.includes.length > 0) {
+      doc.setFontSize(8);
+      item.includes.forEach((inc: string) => {
+        if (inc.trim()) {
+          doc.text(`  - ${inc}`, 20, yPos);
+          yPos += 4;
+        }
+      });
+      doc.setFontSize(9);
     }
-
-    if (item.notes) itemsList += `   ${item.notes}\n`;
-    itemsList += '\n';
   });
 
-  return `
-Estimado/a ${clientName},
+  if (distanceFee > 0) {
+    doc.text(`Desplaçament (${distanceKm} km)`, 15, yPos);
+    doc.text(`${distanceFee.toFixed(2)} €`, 170, yPos);
+    yPos += 5;
+  }
 
-Tras la visita técnica realizada, le presentamos el presupuesto detallado para su obra.
+  if (observations) {
+    yPos += 5;
+    doc.setFontSize(8);
+    const obsLines = doc.splitTextToSize(`*${observations}`, 180);
+    doc.text(obsLines, 15, yPos);
+    yPos += obsLines.length * 4 + 5;
+  }
 
-═══════════════════════════════════════════════════════════
-PRESUPUESTO: ${projectName.toUpperCase()}
-═══════════════════════════════════════════════════════════
+  yPos += 10;
+  doc.text('Mètode de pagament: Transferencia bancaria.', 15, yPos);
+  yPos += 5;
+  doc.text('Entidad: Banco Santander', 15, yPos);
+  yPos += 5;
+  doc.text('IBAN: ES19 0049 6783 9726 9504 4312', 15, yPos);
 
-SERVICIOS INCLUIDOS
-───────────────────────────────────────────────────────────
+  yPos += 15;
+  const subtotal = total;
+  const iva = subtotal * 0.21;
+  const totalTotal = subtotal + iva;
 
-${itemsList}
-${
-  distanceFee > 0
-    ? `Gastos de desplazamiento (${distanceKm} km):        ${distanceFee.toFixed(
-        2
-      )}€\n`
-    : ''
+  doc.setFontSize(10);
+  doc.text('SUB-TOTAL', 130, yPos);
+  doc.text(`${subtotal.toFixed(2)} €`, 170, yPos);
+  yPos += 6;
+  doc.text('IVA 21%', 130, yPos);
+  doc.text(`${iva.toFixed(2)} €`, 170, yPos);
+  yPos += 6;
+  doc.setFont(undefined, 'bold');
+  doc.text('TOTAL TOTAL', 130, yPos);
+  doc.text(`${totalTotal.toFixed(2)} €`, 170, yPos);
+
+  return doc.output('datauristring').split(',')[1];
 }
-═══════════════════════════════════════════════════════════
-IMPORTE TOTAL:                             ${totalPrice.toFixed(2)}€
-═══════════════════════════════════════════════════════════
 
-${observations ? `OBSERVACIONES:\n${observations}\n\n` : ''}
-✓ Presupuesto elaborado tras visita técnica
-✓ Materiales de primera calidad incluidos
-✓ Garantía de todos los trabajos realizados
-✓ Validez del presupuesto: 15 días
-
-Quedamos a su entera disposición para cualquier consulta.
-
-Un cordial saludo.
-`.trim();
-}
-
-/* ────────────────────────────────────────────── */
-/* SEND EMAIL (GMAIL / NODEMAILER)                 */
-/* ────────────────────────────────────────────── */
-async function sendEmail(
+async function sendEmailWithPDF(
   to: string,
   name: string,
   project: string,
-  content: string
+  content: string,
+  pdfBase64: string,
+  budgetNumber: number
 ): Promise<boolean> {
   const gmailUser = process.env.GMAIL_USER;
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
   if (!gmailUser || !gmailPass) {
-    console.warn('Gmail não configurado');
+    console.warn('Gmail no configurado');
     return false;
   }
 
   try {
     const nodemailer = require('nodemailer');
-
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: {
-        user: gmailUser,
-        pass: gmailPass,
-      },
+      auth: { user: gmailUser, pass: gmailPass },
     });
 
-
-
-
     await transporter.sendMail({
-  from: `"Presupuestos" <${gmailUser}>`,
-  to: to,
-  subject: `Presupuesto: ${project} - ${name}`,
-  text: content, // content já vem editado ou não do frontend
-});
-
-
-
-
-    
+      from: `"Eduardo Bruno" <${gmailUser}>`,
+      to: to,
+      subject: `Pressupost ${budgetNumber}/025 - ${project}`,
+      text: content,
+      attachments: [
+        {
+          filename: `Pressupost_${budgetNumber}_025.pdf`,
+          content: pdfBase64,
+          encoding: 'base64',
+        },
+      ],
+    });
 
     return true;
   } catch (error) {
