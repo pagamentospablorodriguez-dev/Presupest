@@ -1,6 +1,5 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import jsPDF from 'jspdf';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
@@ -111,7 +110,7 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    const pdfBase64 = generatePDF(
+    const pdfBase64 = await generatePDF(
       data.clientName,
       data.clientEmail,
       data.clientPhone || '',
@@ -161,7 +160,7 @@ export const handler: Handler = async (event) => {
   }
 };
 
-function generatePDF(
+async function generatePDF(
   clientName: string,
   clientEmail: string,
   clientPhone: string,
@@ -171,7 +170,8 @@ function generatePDF(
   distanceKm: number,
   total: number,
   observations: string
-): string {
+): Promise<string> {
+  const { jsPDF } = require('jspdf');
   const doc = new jsPDF();
 
   const today = new Date();
