@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/Bolt Database-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL as string;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
@@ -20,6 +20,8 @@ interface ProjectRequest {
   distanceKm: number;
   clientObservations?: string;
   emailContent?: string;
+  emailSubject?: string;
+  budgetNumber?: number;
   items: BudgetItem[];
 }
 
@@ -83,8 +85,7 @@ export const handler: Handler = async (event) => {
     const distanceFee = data.distanceKm > 15 ? (data.distanceKm - 15) * 3 : 0;
     totalGeneral += distanceFee;
 
-    const budgetNumberResult = await supabaseAdmin.rpc('nextval', { sequence_name: 'budget_number_seq' });
-    const budgetNumber = budgetNumberResult.data || 150;
+    const budgetNumber = data.budgetNumber || 150;
 
     const projectData = {
       client_id: clientId,
@@ -123,6 +124,7 @@ export const handler: Handler = async (event) => {
     );
 
     const emailContent = data.emailContent || `Buenas tardes ${data.clientName.split(' ')[0]},\n\nTe envío propuesta de ${data.projectName}.\n\nUn saludo.`;
+    const emailSubject = data.emailSubject || `Pressupost ${budgetNumber}/025 - ${data.projectName}`;
 
     await supabaseAdmin.from('email_history').insert({
       budget_id: project.data!.id,
@@ -132,8 +134,7 @@ export const handler: Handler = async (event) => {
 
     const emailSent = await sendEmailWithPDF(
       data.clientEmail,
-      data.clientName,
-      data.projectName,
+      emailSubject,
       emailContent,
       pdfBase64,
       budgetNumber
@@ -177,49 +178,76 @@ async function generatePDF(
   const today = new Date();
   const dateStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getFullYear()).slice(-2)}`;
 
-  doc.setFontSize(9);
-  doc.text('Eduardo Bruno Rodríguez González', 14, 15);
-  doc.text('Calle Tarragona, 27 08570 Torello', 14, 20);
-  doc.text('NIF: 44724261W', 14, 25);
-  doc.text('Teléfono: 637 30 69 32', 14, 30);
-  doc.text('Mail: eduarbruno27@gmail.com', 14, 35);
-
-  doc.text(clientName, 120, 15);
-  doc.text(clientEmail, 120, 20);
-  if (clientPhone) doc.text(clientPhone, 120, 25);
-
-  doc.rect(14, 10, 182, 30);
-
-  doc.setFontSize(10);
-  doc.text(`Pressupost: ${budgetNumber}/025`, 14, 50);
-  doc.text(dateStr, 160, 50);
-
-  doc.rect(14, 45, 182, 7);
+  doc.setLineWidth(0.8);
+  doc.rect(14, 10, 90, 32);
+  doc.rect(106, 10, 90, 32);
 
   doc.setFontSize(9);
   doc.setFont(undefined, 'bold');
-  doc.text('DESCRIPCIÓN', 14, 60);
-  doc.text('TOTAL', 180, 60, { align: 'right' });
+  doc.text('Eduardo Bruno Rodríguez González', 16, 16);
   doc.setFont(undefined, 'normal');
+  doc.text('Calle Tarragona, 27 08570 Torello', 16, 21);
+  doc.setFont(undefined, 'bold');
+  doc.text('NIF:', 16, 26);
+  doc.setFont(undefined, 'normal');
+  doc.text(' 44724261W', 23, 26);
+  doc.setFont(undefined, 'bold');
+  doc.text('Teléfono:', 16, 31);
+  doc.setFont(undefined, 'normal');
+  doc.text(' 637 30 69 32', 32, 31);
+  doc.setFont(undefined, 'bold');
+  doc.text('Mail:', 16, 36);
+  doc.setFont(undefined, 'normal');
+  doc.text(' eduarbruno27@gmail.com', 25, 36);
 
-  doc.rect(14, 55, 182, 7);
+  doc.setFont(undefined, 'bold');
+  doc.text(clientName, 108, 16);
+  doc.setFont(undefined, 'normal');
+  doc.setFont(undefined, 'bold');
+  doc.text('Mail:', 108, 21);
+  doc.setFont(undefined, 'normal');
+  doc.text(` ${clientEmail}`, 117, 21);
+  if (clientPhone) {
+    doc.setFont(undefined, 'bold');
+    doc.text('Teléfono:', 108, 26);
+    doc.setFont(undefined, 'normal');
+    doc.text(` ${clientPhone}`, 124, 26);
+  }
+
+  doc.setLineWidth(0.8);
+  doc.rect(14, 45, 182, 8);
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.text(`Pressupost: ${budgetNumber}/025`, 16, 50);
+  doc.setFont(undefined, 'normal');
+  doc.text(dateStr, 175, 50);
+
+  doc.setLineWidth(0.8);
+  doc.rect(14, 56, 140, 7);
+  doc.rect(154, 56, 42, 7);
+
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text('DESCRIPCIÓN', 16, 61);
+  doc.text('TOTAL', 180, 61, { align: 'right' });
+  doc.setFont(undefined, 'normal');
 
   let yPos = 68;
 
   items.forEach((item) => {
-    const serviceLine = `${item.quantity} ${item.service.name}`;
-    doc.text(serviceLine, 14, yPos);
-    doc.text(`${item.itemTotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
+    const serviceLine = `${item.quantity} ${item.service.unit} ${item.service.name}`;
+    doc.text(serviceLine, 16, yPos);
+    doc.text(`${item.itemTotal.toFixed(2)} €`, 189, yPos, { align: 'right' });
     yPos += 5;
 
     if (item.includes && item.includes.length > 0) {
       doc.setFontSize(8);
       item.includes.forEach((inc: string) => {
         if (inc.trim()) {
-          const includeText = `Opció: ${inc}`;
-          const lines = doc.splitTextToSize(includeText, 160);
+          const lines = doc.splitTextToSize(inc, 170);
           lines.forEach((line: string) => {
-            doc.text(line, 14, yPos);
+            doc.text(line, 16, yPos);
             yPos += 4;
           });
         }
@@ -229,8 +257,8 @@ async function generatePDF(
   });
 
   if (distanceFee > 0) {
-    doc.text(`Desplaçament (${distanceKm} km)`, 14, yPos);
-    doc.text(`${distanceFee.toFixed(2)} €`, 180, yPos, { align: 'right' });
+    doc.text(`Desplaçament (${distanceKm} km)`, 16, yPos);
+    doc.text(`${distanceFee.toFixed(2)} €`, 189, yPos, { align: 'right' });
     yPos += 5;
   }
 
@@ -239,43 +267,79 @@ async function generatePDF(
     doc.setFontSize(8);
     const obsLines = doc.splitTextToSize(`*${observations}`, 180);
     obsLines.forEach((line: string) => {
-      doc.text(line, 14, yPos);
+      doc.text(line, 16, yPos);
       yPos += 4;
     });
     doc.setFontSize(9);
     yPos += 3;
   }
 
-  yPos += 5;
-  doc.text('Mètode de pagament: Transferencia bancaria.', 14, yPos);
-  yPos += 5;
-  doc.text('Entidad: Banco Santander', 14, yPos);
-  yPos += 5;
-  doc.text('IBAN: ES19 0049 6783 9726 9504 4312', 14, yPos);
+  yPos += 2;
+  doc.setFontSize(8);
+  doc.text('*Termini d\'entrega previst, segona - tercera setmana de gener.', 16, yPos);
+  yPos += 4;
+  doc.text('*Treballs complementaris no inclosos (Electricista, pintor...)', 16, yPos);
+  yPos += 6;
+  doc.setFontSize(9);
 
-  yPos += 15;
+  doc.text('Mètode de pagament: Transferencia bancaria.', 16, yPos);
+  yPos += 5;
+  doc.text('Entidad: Banco Santander', 16, yPos);
+  yPos += 5;
+  doc.text('IBAN: ES19 0049 6783 9726 9504 4312', 16, yPos);
+
+  yPos += 12;
   const subtotal = total;
   const iva = subtotal * 0.21;
   const totalTotal = subtotal + iva;
 
+  doc.setFillColor(173, 216, 230);
+  doc.rect(14, yPos - 5, 182, 6, 'F');
+  doc.setLineWidth(0.8);
+  doc.rect(14, yPos - 5, 140, 6);
+  doc.rect(154, yPos - 5, 42, 6);
+
   doc.setFontSize(10);
-  doc.text('SUB-TOTAL', 140, yPos);
-  doc.text(`${subtotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
-  yPos += 6;
-  doc.text('IVA 21%', 140, yPos);
-  doc.text(`${iva.toFixed(2)} €`, 180, yPos, { align: 'right' });
-  yPos += 6;
+  doc.setTextColor(0, 102, 204);
   doc.setFont(undefined, 'bold');
-  doc.text('TOTAL TOTAL', 140, yPos);
-  doc.text(`${totalTotal.toFixed(2)} €`, 180, yPos, { align: 'right' });
+  doc.text('SUB-TOTAL', 16, yPos);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont(undefined, 'normal');
+  doc.text(`${subtotal.toFixed(2)} €`, 189, yPos, { align: 'right' });
+  
+  yPos += 6;
+  doc.setFillColor(173, 216, 230);
+  doc.rect(14, yPos - 5, 182, 6, 'F');
+  doc.setLineWidth(0.8);
+  doc.rect(14, yPos - 5, 140, 6);
+  doc.rect(154, yPos - 5, 42, 6);
+
+  doc.setTextColor(0, 102, 204);
+  doc.setFont(undefined, 'bold');
+  doc.text('IVA 21%', 16, yPos);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont(undefined, 'normal');
+  doc.text(`${iva.toFixed(2)} €`, 189, yPos, { align: 'right' });
+  
+  yPos += 6;
+  doc.setFillColor(173, 216, 230);
+  doc.rect(14, yPos - 5, 182, 6, 'F');
+  doc.setLineWidth(0.8);
+  doc.rect(14, yPos - 5, 140, 6);
+  doc.rect(154, yPos - 5, 42, 6);
+
+  doc.setTextColor(0, 102, 204);
+  doc.setFont(undefined, 'bold');
+  doc.text('TOTAL TOTAL', 16, yPos);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${totalTotal.toFixed(2)} €`, 189, yPos, { align: 'right' });
 
   return doc.output('datauristring').split(',')[1];
 }
 
 async function sendEmailWithPDF(
   to: string,
-  name: string,
-  project: string,
+  subject: string,
   content: string,
   pdfBase64: string,
   budgetNumber: number
@@ -298,7 +362,7 @@ async function sendEmailWithPDF(
     await transporter.sendMail({
       from: `"Eduardo Bruno" <${gmailUser}>`,
       to: to,
-      subject: `Pressupost ${budgetNumber}/025 - ${project}`,
+      subject: subject,
       text: content,
       attachments: [
         {
