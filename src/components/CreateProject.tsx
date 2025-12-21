@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Download, Edit2 } from 'lucide-react';
+import { Bolt Database } from '../lib/supabase';
+import { Send, Loader2, CheckCircle, Plus, Trash2, Eye, Edit2 } from 'lucide-react';
+
+interface Service {
+  id: string;
+  name: string;
+  base_price: string;
+  unit: string;
+}
 
 interface BudgetItem {
   serviceId: string;
@@ -15,6 +22,9 @@ export default function CreateProject() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailContent, setEmailContent] = useState('');
 
   const [formData, setFormData] = useState({
     clientName: '',
@@ -88,6 +98,17 @@ export default function CreateProject() {
     return (total + distanceFee).toFixed(2);
   };
 
+  const generateEmailContent = () => {
+    const firstName = formData.clientName.split(' ')[0];
+    return `Buenas tardes ${firstName},\n\nTe envío propuesta de ${formData.projectName}.\n\nUn saludo.`;
+  };
+
+  const handlePreview = () => {
+    setEmailContent(generateEmailContent());
+    setShowPreview(true);
+    setEditingEmail(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -95,12 +116,15 @@ export default function CreateProject() {
     setSuccess(false);
 
     try {
+      const finalEmailContent = showPreview && emailContent ? emailContent : generateEmailContent();
+
       const response = await fetch('/.netlify/functions/generate-project-budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           distanceKm: parseFloat(formData.distanceKm),
+          emailContent: finalEmailContent,
           items: items.map((item) => ({
             serviceId: item.serviceId,
             quantity: parseFloat(item.quantity),
@@ -123,6 +147,8 @@ export default function CreateProject() {
           clientObservations: '',
         });
         setItems([{ serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] }]);
+        setShowPreview(false);
+        setEditingEmail(false);
       } else {
         setError(result.error || 'Error al generar presupuesto');
       }
@@ -360,23 +386,62 @@ export default function CreateProject() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Generando y enviando...</span>
-              </>
-            ) : (
-              <>
-                <Send className="h-5 w-5" />
-                <span>Generar y Enviar Presupuesto</span>
-              </>
-            )}
-          </button>
+          {showPreview && (
+            <div className="bg-gray-100 p-4 rounded-md border border-gray-300">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold text-gray-900">VISTA PREVIA DEL EMAIL</h4>
+                <button
+                  type="button"
+                  onClick={() => setEditingEmail(!editingEmail)}
+                  className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span>{editingEmail ? 'Ver' : 'Editar'}</span>
+                </button>
+              </div>
+              {editingEmail ? (
+                <textarea
+                  rows={6}
+                  value={emailContent}
+                  onChange={(e) => setEmailContent(e.target.value)}
+                  className="w-full p-4 border border-gray-300 rounded text-sm"
+                />
+              ) : (
+                <div className="bg-white p-4 rounded text-sm text-gray-700 whitespace-pre-wrap">
+                  {emailContent}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={editingEmail}
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 disabled:bg-gray-400 flex items-center justify-center space-x-2"
+            >
+              <Eye className="h-5 w-5" />
+              <span>{showPreview ? 'Actualizar' : 'Ver'} Preview</span>
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Enviando...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5" />
+                  <span>Enviar Presupuesto</span>
+                </>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
