@@ -1,4 +1,4 @@
-import { FileText, Settings, Mail, List } from 'lucide-react';
+import { FileText, Settings, Mail, List, Receipt } from 'lucide-react';
 
 type NavigationProps = {
   currentPage: string;
@@ -9,6 +9,8 @@ export default function Navigation({ currentPage, onNavigate }: NavigationProps)
   const navItems = [
     { id: 'create', label: 'Nuevo Presupuesto', icon: FileText },
     { id: 'budgets', label: 'Presupuestos', icon: List },
+    { id: 'invoice', label: 'Nueva Factura', icon: Receipt },
+    { id: 'invoices', label: 'Facturas', icon: Receipt },
     { id: 'respond', label: 'Responder Email', icon: Mail },
     { id: 'services', label: 'Servicios', icon: Settings },
   ];
