@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bolt Database } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Calendar, User, Mail, DollarSign, AlertCircle } from 'lucide-react';
 
 interface Invoice {
@@ -25,7 +25,7 @@ export default function ViewInvoices() {
 
   const loadInvoices = async () => {
     setLoading(true);
-    const { data } = await Bolt Database
+    const { data } = await supabase
       .from('invoices')
       .select(`
         *,
