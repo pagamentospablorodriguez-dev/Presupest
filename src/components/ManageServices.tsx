@@ -141,7 +141,7 @@ export default function ManageServices() {
                 >
                   <option value="m²">m²</option>
                   <option value="m">m</option>
-                  <option value="m">ml</option>
+                  <option value="ml">ml</option>
                   <option value="unidad">unidad</option>
                   <option value="punto">punto</option>
                   <option value="hora">hora</option>
