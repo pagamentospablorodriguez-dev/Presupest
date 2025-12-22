@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Navigation from './components/Navigation';
 import CreateProject from './components/CreateProject';
 import ViewBudgets from './components/ViewBudgets';
+import CreateInvoice from './components/CreateInvoice';
+import ViewInvoices from './components/ViewInvoices';
 import RespondEmail from './components/RespondEmail';
 import ManageServices from './components/ManageServices';
 
@@ -14,6 +16,10 @@ function App() {
         return <CreateProject />;
       case 'budgets':
         return <ViewBudgets />;
+      case 'invoice':
+        return <CreateInvoice />;
+      case 'invoices':
+        return <ViewInvoices />;
       case 'respond':
         return <RespondEmail />;
       case 'services':
