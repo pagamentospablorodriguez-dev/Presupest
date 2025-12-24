@@ -15,6 +15,7 @@ interface BudgetItem {
   difficultyFactor: string;
   internalNotes: string;
   includesItems: string[];
+  priceIncrease: boolean;
 }
 
 export default function CreateProject() {
@@ -40,8 +41,9 @@ export default function CreateProject() {
   });
 
   const [items, setItems] = useState<BudgetItem[]>([
-    { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] },
-  ]);
+  { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [], priceIncrease: false },
+]);
+
 
   useEffect(() => {
     loadServices();
@@ -53,8 +55,9 @@ export default function CreateProject() {
   };
 
   const addItem = () => {
-    setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] }]);
-  };
+  setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [], priceIncrease: false }]);
+};
+
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
@@ -85,16 +88,26 @@ export default function CreateProject() {
   };
 
   const calculateTotal = () => {
-    let total = 0;
-    items.forEach((item) => {
-      const service = services.find((s) => s.id === item.serviceId);
-      if (service && item.quantity && item.difficultyFactor) {
-        const basePrice = parseFloat(service.base_price);
-        const quantity = parseFloat(item.quantity);
-        const difficulty = parseFloat(item.difficultyFactor);
-        total += (basePrice * quantity) * difficulty;
+  let total = 0;
+  items.forEach((item) => {
+    const service = services.find((s) => s.id === item.serviceId);
+    if (service && item.quantity && item.difficultyFactor) {
+      let basePrice = parseFloat(service.base_price);
+      if (item.priceIncrease) {
+        basePrice = basePrice * 1.10;
       }
-    });
+      const quantity = parseFloat(item.quantity);
+      const difficulty = parseFloat(item.difficultyFactor);
+      total += (basePrice * quantity) * difficulty;
+    }
+  });
+
+  const distanceKm = parseFloat(formData.distanceKm) || 0;
+  const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
+
+  return (total + distanceFee).toFixed(2);
+};
+
 
     const distanceKm = parseFloat(formData.distanceKm) || 0;
     const distanceFee = distanceKm > 15 ? (distanceKm - 15) * 3 : 0;
@@ -311,111 +324,137 @@ export default function CreateProject() {
             </div>
 
             {items.map((item, index) => (
-              <div key={index} className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-3">
-                  <div className="md:col-span-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Servicio *</label>
-                    <select
-                      required
-                      value={item.serviceId}
-                      onChange={(e) => updateItem(index, 'serviceId', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Selecciona servicio</option>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} - {s.base_price}€/{s.unit}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cantidad {getServiceUnit(item.serviceId) && `(${getServiceUnit(item.serviceId)})`} *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Dificultad *</label>
-                    <select
-                      required
-                      value={item.difficultyFactor}
-                      onChange={(e) => updateItem(index, 'difficultyFactor', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="1.0">Normal (1.0x)</option>
-                      <option value="1.2">Media (1.2x)</option>
-                      <option value="1.5">Alta (1.5x)</option>
-                      <option value="2.0">Muy difícil (2.0x)</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nota Interna <span className="text-xs text-gray-500">(No va en PDF)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={item.internalNotes}
-                      onChange={(e) => updateItem(index, 'internalNotes', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="md:col-span-1 flex items-end">
-                    {items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-300">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Qué incluye (opcional)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => addIncludeItem(index)}
-                      className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>Añadir item</span>
-                    </button>
-                  </div>
-                  {item.includesItems.map((inc, incIndex) => (
-                    <div key={incIndex} className="flex items-center space-x-2 mb-2">
-                      <span className="text-gray-600">-</span>
-                      <input
-                        type="text"
-                        value={inc}
-                        onChange={(e) => updateIncludeItem(index, incIndex, e.target.value)}
-                        className="flex-1 px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                        placeholder="Ej: Material de primera calidad"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeIncludeItem(index, incIndex)}
-                        className="text-red-600 hover:bg-red-50 rounded p-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+
+
+
+
+
+
+
+
+
+      
+      <div key={index} className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-3">
+    <div className="md:col-span-4">
+      <label className="block text-sm font-medium text-gray-700 mb-2">Servicio *</label>
+      <select
+        required
+        value={item.serviceId}
+        onChange={(e) => updateItem(index, 'serviceId', e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Selecciona servicio</option>
+        {services.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} - {s.base_price}€/{s.unit}
+          </option>
+        ))}
+      </select>
+    </div>
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Cantidad {getServiceUnit(item.serviceId) && `(${getServiceUnit(item.serviceId)})`} *
+      </label>
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        required
+        value={item.quantity}
+        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">Dificultad *</label>
+      <select
+        required
+        value={item.difficultyFactor}
+        onChange={(e) => updateItem(index, 'difficultyFactor', e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="1.0">Normal (1.0x)</option>
+        <option value="1.2">Media (1.2x)</option>
+        <option value="1.5">Alta (1.5x)</option>
+        <option value="2.0">Muy difícil (2.0x)</option>
+      </select>
+    </div>
+    <div className="md:col-span-1">
+      <label className="block text-sm font-medium text-gray-700 mb-2">+10%</label>
+      <input
+        type="checkbox"
+        checked={item.priceIncrease}
+        onChange={(e) => updateItem(index, 'priceIncrease', e.target.checked)}
+        className="w-6 h-6 mt-2 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Nota Interna <span className="text-xs text-gray-500">(No va en PDF)</span>
+      </label>
+      <input
+        type="text"
+        value={item.internalNotes}
+        onChange={(e) => updateItem(index, 'internalNotes', e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div className="md:col-span-1 flex items-end">
+      {items.length > 1 && (
+        <button
+          type="button"
+          onClick={() => removeItem(index)}
+          className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
+      )}
+    </div>
+  </div>
+
+  <div className="mt-3 pt-3 border-t border-gray-300">
+    <div className="flex justify-between items-center mb-2">
+      <label className="text-sm font-medium text-gray-700">
+        Qué incluye (opcional)
+      </label>
+      <button
+        type="button"
+        onClick={() => addIncludeItem(index)}
+        className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+      >
+        <Plus className="h-4 w-4" />
+        <span>Añadir item</span>
+      </button>
+    </div>
+    {item.includesItems.map((inc, incIndex) => (
+      <div key={incIndex} className="flex items-center space-x-2 mb-2">
+        <span className="text-gray-600">-</span>
+        <input
+          type="text"
+          value={inc}
+          onChange={(e) => updateIncludeItem(index, incIndex, e.target.value)}
+          className="flex-1 px-3 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+          placeholder="Ej: Material de primera calidad"
+        />
+        <button
+          type="button"
+          onClick={() => removeIncludeItem(index, incIndex)}
+          className="text-red-600 hover:bg-red-50 rounded p-1"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
+
+      
+
+
+
+      
             ))}
           </div>
 
