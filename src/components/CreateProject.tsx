@@ -15,6 +15,7 @@ interface BudgetItem {
   difficultyFactor: string;
   internalNotes: string;
   includesItems: string[];
+  priceIncrease: boolean;
 }
 
 export default function CreateProject() {
@@ -40,7 +41,7 @@ export default function CreateProject() {
   });
 
   const [items, setItems] = useState<BudgetItem[]>([
-    { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] },
+    { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [], priceIncrease: false },
   ]);
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function CreateProject() {
   };
 
   const addItem = () => {
-    setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [] }]);
+    setItems([...items, { serviceId: '', quantity: '', difficultyFactor: '1.0', internalNotes: '', includesItems: [], priceIncrease: false }]);
   };
 
   const removeItem = (index: number) => {
@@ -89,7 +90,10 @@ export default function CreateProject() {
     items.forEach((item) => {
       const service = services.find((s) => s.id === item.serviceId);
       if (service && item.quantity && item.difficultyFactor) {
-        const basePrice = parseFloat(service.base_price);
+        let basePrice = parseFloat(service.base_price);
+        if (item.priceIncrease) {
+          basePrice = basePrice * 1.10;
+        }
         const quantity = parseFloat(item.quantity);
         const difficulty = parseFloat(item.difficultyFactor);
         total += (basePrice * quantity) * difficulty;
@@ -357,7 +361,16 @@ export default function CreateProject() {
                       <option value="2.0">Muy difícil (2.0x)</option>
                     </select>
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">+10%</label>
+                    <input
+                      type="checkbox"
+                      checked={item.priceIncrease}
+                      onChange={(e) => updateItem(index, 'priceIncrease', e.target.checked)}
+                      className="w-6 h-6 mt-2 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Nota Interna <span className="text-xs text-gray-500">(No va en PDF)</span>
                     </label>
